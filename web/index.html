@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>P2PShare Web</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>P2PShare Web - Mobile Sharing</title>
+  <link rel="icon" type="image/png" href="icon128.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,16 +21,21 @@
       <!-- Connection Screen -->
       <section id="setup-section" class="card active">
         <div class="card-content">
-          <h2>P2P Sharing</h2>
-          <p class="subtitle">Direct, secure, no limits. Host to share or enter a code to join.</p>
+          <h2>Direct Share</h2>
+          <p class="subtitle">Secure, fast, no limits. Host to share or Scan to join.</p>
           
           <div class="action-group">
-            <button id="btn-host" class="primary-btn">
-              <span class="icon">📡</span> Host to Share
+            <button id="btn-host" class="primary-btn pulse">
+              <span class="icon">📡</span> Host a Room
             </button>
             <div class="divider"><span>OR</span></div>
+            
+            <button id="btn-scan" class="scan-btn">
+              <span class="icon">🔍</span> Scan QR Code
+            </button>
+
             <div class="input-group">
-              <input type="text" id="join-id" placeholder="6-digit code..." inputmode="numeric">
+              <input type="text" id="join-id" placeholder="6-digit code..." inputmode="numeric" maxlength="6">
               <button id="btn-join" class="secondary-btn">Join</button>
             </div>
           </div>
@@ -40,7 +46,7 @@
       <section id="share-section" class="card hidden">
         <div class="card-content">
           <div class="room-info">
-            <span class="label">Connected:</span>
+            <span class="label">Connected to:</span>
             <span id="remote-peer-id" class="code-text">...</span>
           </div>
 
@@ -66,14 +72,21 @@
             <span id="my-peer-id" class="large-code">------</span>
           </div>
           
-          <div id="qrcode-container" class="qrcode-container">
-            <!-- QR Code generated here -->
-          </div>
+          <div id="qrcode-container" class="qrcode-container"></div>
           
-          <p class="info-text">Scan the QR or share the code above.</p>
+          <p class="info-text">Scan with mobile to join instantly.</p>
           <button id="btn-cancel-host" class="outline-btn">Cancel</button>
         </div>
       </section>
+
+      <!-- Scanner Modal -->
+      <div id="scanner-modal" class="modal hidden">
+        <div class="modal-content card">
+          <h3>Scan QR Code</h3>
+          <div id="qr-reader"></div>
+          <button id="btn-close-scanner" class="outline-btn">Close Camera</button>
+        </div>
+      </div>
     </main>
 
     <footer>
@@ -83,6 +96,7 @@
 
   <script src="peerjs.min.js"></script>
   <script src="qrcode.min.js"></script>
+  <script src="html5-qrcode.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

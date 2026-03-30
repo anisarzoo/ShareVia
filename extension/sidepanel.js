@@ -15,7 +15,8 @@ const transferList = document.getElementById('transfer-list');
 const joinIdInput = document.getElementById('join-id');
 const qrcodeContainer = document.getElementById('qrcode-container');
 
-const WEB_APP_URL = "https://p2p-share-web.vercel.app"; 
+// UPDATE THIS: Point this to your hosted web app (e.g. GitHub Pages or Vercel)
+const WEB_APP_URL = window.location.origin + "/web"; 
 
 // --- Initialization ---
 

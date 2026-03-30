@@ -1,11 +1,13 @@
 let peer = null;
 let conn = null;
 let myId = null;
+let html5QrCode = null;
 
 // DOM Elements
 const setupSection = document.getElementById('setup-section');
 const hostingSection = document.getElementById('hosting-section');
 const shareSection = document.getElementById('share-section');
+const scannerModal = document.getElementById('scanner-modal');
 const statusBadge = document.getElementById('status-badge');
 const myPeerIdEl = document.getElementById('my-peer-id');
 const remotePeerIdEl = document.getElementById('remote-peer-id');
@@ -64,7 +66,81 @@ function generateQRCode(id) {
   });
 }
 
+// --- Scanning Logic ---
+
+async function startScanner() {
+  scannerModal.classList.remove('hidden');
+  
+  // Ensure the element is visible before initializing Html5Qrcode
+  setTimeout(async () => {
+    try {
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("qr-reader");
+      }
+      
+      const config = { 
+        fps: 10, 
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+      };
+
+      await html5QrCode.start(
+        { facingMode: "environment" }, 
+        config,
+        (decodedText) => {
+          handleScanResult(decodedText);
+        }
+      );
+    } catch (err) {
+      console.error("Scanner error:", err);
+      let msg = "Could not start camera.";
+      if (err.name === "NotAllowedError") msg = "Camera permission denied.";
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        msg = "Camera scanning requires HTTPS.";
+      }
+      alert(msg);
+      stopScanner();
+    }
+  }, 100);
+}
+
+function stopScanner() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      scannerModal.classList.add('hidden');
+    }).catch(err => {
+      console.error("Stop error:", err);
+      scannerModal.classList.add('hidden');
+    });
+  } else {
+    scannerModal.classList.add('hidden');
+  }
+}
+
+function handleScanResult(text) {
+  // Try to parse URL to get hash (the Room ID)
+  try {
+    const url = new URL(text);
+    const hashId = url.hash.substring(1);
+    if (hashId && hashId.length === 6) {
+      stopScanner();
+      joinRoom(hashId);
+    }
+  } catch (e) {
+    // If it's just the 6-digit code in plain text
+    if (text.length === 6 && /^\d+$/.test(text)) {
+      stopScanner();
+      joinRoom(text);
+    }
+  }
+}
+
 // --- Connection Handling ---
+
+function joinRoom(id) {
+  initPeer();
+  peer.on('open', () => setupConnection(peer.connect(id)));
+}
 
 function setupConnection(connection) {
   conn = connection;
@@ -170,6 +246,7 @@ async function sendFile(file) {
     });
     offset += chunkSize;
     updateTransferProgress(transferId, (offset / file.size) * 100);
+    // Add small delay to keep mobile browser thread alive
     if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
   }
 
@@ -202,11 +279,11 @@ function createTransferUI(id, name, size, type) {
   div.id = `transfer-${id}`;
   div.className = 'transfer-item';
   div.dataset.filename = name;
-  const sizeStr = (size / (1024 * 1024)).toFixed(2) + ' MB';
+  const sizeMB = (size / (1024 * 1024)).toFixed(2);
   div.innerHTML = `
-    <div style="display:flex; justify-content:space-between; font-size:0.9rem">
+    <div style="display:flex; justify-content:space-between; font-size:0.9rem; font-weight:700">
       <span>${type === 'sending' ? '⬆️' : '⬇️'} ${name}</span>
-      <span>${sizeStr}</span>
+      <span>${sizeMB} MB</span>
     </div>
     <div class="progress-container"><div class="progress-bar"></div></div>
   `;
@@ -226,11 +303,13 @@ document.getElementById('btn-host').addEventListener('click', () => {
   showSection(hostingSection);
 });
 
+document.getElementById('btn-scan').addEventListener('click', startScanner);
+document.getElementById('btn-close-scanner').addEventListener('click', stopScanner);
+
 document.getElementById('btn-join').addEventListener('click', () => {
   const id = joinIdInput.value.trim();
   if (!id) return;
-  initPeer();
-  peer.on('open', () => setupConnection(peer.connect(id)));
+  joinRoom(id);
 });
 
 document.getElementById('btn-cancel-host').addEventListener('click', resetToSetup);
@@ -242,11 +321,10 @@ fileInput.addEventListener('change', () => {
   fileInput.value = '';
 });
 
-// Auto-join from URL hash
+// Auto-join from URL hash (for QR scan links)
 window.addEventListener('load', () => {
   const hashId = window.location.hash.substring(1);
   if (hashId && hashId.length === 6) {
-    initPeer();
-    peer.on('open', () => setupConnection(peer.connect(hashId)));
+    joinRoom(hashId);
   }
 });
