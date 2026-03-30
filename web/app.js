@@ -15,16 +15,12 @@ const transferList = document.getElementById('transfer-list');
 const joinIdInput = document.getElementById('join-id');
 const qrcodeContainer = document.getElementById('qrcode-container');
 
-const WEB_APP_URL = "https://p2p-share-web.vercel.app"; 
-
 // --- Initialization ---
 
 function initPeer(id = null) {
   if (peer) peer.destroy();
   
-  peer = new Peer(id, {
-    debug: 2
-  });
+  peer = new Peer(id, { debug: 1 });
 
   peer.on('open', (id) => {
     myId = id;
@@ -43,24 +39,25 @@ function initPeer(id = null) {
 
   peer.on('error', (err) => {
     console.error('Peer error:', err);
-    alert('Error: ' + err.type);
+    if (err.type === 'peer-unavailable') {
+      alert('Peer not found. Make sure the code is correct.');
+    } else {
+      alert('Error: ' + err.type);
+    }
     resetToSetup();
-  });
-
-  peer.on('disconnected', () => {
-    updateStatus('Disconnected', 'disconnected');
   });
 }
 
 function generateQRCode(id) {
   qrcodeContainer.innerHTML = '';
-  // The QR code contains the URL of the web app with the ID as a fragment
-  const joinUrl = `${WEB_APP_URL}/#${id}`;
+  // Construct the join URL
+  const baseUrl = window.location.origin + window.location.pathname;
+  const joinUrl = `${baseUrl}#${id}`;
   
   new QRCode(qrcodeContainer, {
     text: joinUrl,
-    width: 200,
-    height: 200,
+    width: 256,
+    height: 256,
     colorDark: "#1a73e8",
     colorLight: "#ffffff",
     correctLevel: QRCode.CorrectLevel.H
@@ -76,7 +73,6 @@ function setupConnection(connection) {
     showSection(shareSection);
     remotePeerIdEl.textContent = conn.peer;
     updateStatus('Connected', 'connected');
-    console.log('Connected to: ' + conn.peer);
   });
 
   conn.on('data', (data) => {
@@ -84,12 +80,6 @@ function setupConnection(connection) {
   });
 
   conn.on('close', () => {
-    console.log('Connection closed');
-    resetToSetup();
-  });
-
-  conn.on('error', (err) => {
-    console.error('Connection error:', err);
     resetToSetup();
   });
 }
@@ -104,17 +94,14 @@ function handleIncomingData(data) {
   }
 }
 
-// --- File Transfer Logic ---
+// --- File Transfer ---
 
-const incomingFiles = {}; // Store chunks by transferId
+const incomingFiles = {};
 
 function handleFileChunk(data) {
   const { transferId, chunk, index } = data;
   if (!incomingFiles[transferId]) {
-    incomingFiles[transferId] = {
-      chunks: [],
-      receivedSize: 0
-    };
+    incomingFiles[transferId] = { chunks: [], receivedSize: 0 };
   }
   
   incomingFiles[transferId].chunks[index] = chunk;
@@ -131,20 +118,25 @@ function finalizeFile(transferId) {
   const blob = new Blob(fileData.chunks);
   const url = URL.createObjectURL(blob);
   
-  // Update UI to show download link
   const item = document.getElementById(`transfer-${transferId}`);
   if (item) {
-    const info = item.querySelector('.transfer-info');
-    info.innerHTML += `<span>✅ Done</span>`;
-    const progressBar = item.querySelector('.progress-bar');
-    progressBar.style.width = '100%';
-    progressBar.classList.add('complete');
+    const bar = item.querySelector('.progress-bar');
+    bar.style.width = '100%';
+    bar.classList.add('complete');
     
-    // Auto-download or show link
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = item.dataset.filename;
-    a.click();
+    // Create download button for mobile
+    const btn = document.createElement('button');
+    btn.className = 'primary-btn';
+    btn.style.marginTop = '10px';
+    btn.style.width = '100%';
+    btn.textContent = 'Save File';
+    btn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = item.dataset.filename;
+      a.click();
+    };
+    item.appendChild(btn);
   }
   
   delete incomingFiles[transferId];
@@ -154,12 +146,11 @@ async function sendFile(file) {
   if (!conn || !conn.open) return;
 
   const transferId = Math.random().toString(36).substr(2, 9);
-  const chunkSize = 16384; // 16KB chunks
+  const chunkSize = 16384; 
   const totalChunks = Math.ceil(file.size / chunkSize);
 
   createTransferUI(transferId, file.name, file.size, 'sending');
 
-  // Notify receiver
   conn.send({
     type: 'file-start',
     transferId,
@@ -178,18 +169,11 @@ async function sendFile(file) {
       totalSize: file.size
     });
     offset += chunkSize;
-    
-    const progress = (offset / file.size) * 100;
-    updateTransferProgress(transferId, Math.min(progress, 100));
-    
-    // Small delay to prevent flooding the channel
-    if (i % 10 === 0) await new Promise(r => setTimeout(r, 10));
+    updateTransferProgress(transferId, (offset / file.size) * 100);
+    if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
   }
 
-  conn.send({
-    type: 'file-end',
-    transferId
-  });
+  conn.send({ type: 'file-end', transferId });
 }
 
 // --- UI Helpers ---
@@ -210,6 +194,7 @@ function resetToSetup() {
   conn = null;
   showSection(setupSection);
   updateStatus('Disconnected', 'disconnected');
+  window.location.hash = '';
 }
 
 function createTransferUI(id, name, size, type) {
@@ -217,28 +202,20 @@ function createTransferUI(id, name, size, type) {
   div.id = `transfer-${id}`;
   div.className = 'transfer-item';
   div.dataset.filename = name;
-  
   const sizeStr = (size / (1024 * 1024)).toFixed(2) + ' MB';
-  
   div.innerHTML = `
-    <div class="transfer-info">
+    <div style="display:flex; justify-content:space-between; font-size:0.9rem">
       <span>${type === 'sending' ? '⬆️' : '⬇️'} ${name}</span>
       <span>${sizeStr}</span>
     </div>
-    <div class="progress-container">
-      <div class="progress-bar"></div>
-    </div>
+    <div class="progress-container"><div class="progress-bar"></div></div>
   `;
-  
   transferList.prepend(div);
 }
 
 function updateTransferProgress(id, progress) {
   const item = document.getElementById(`transfer-${id}`);
-  if (item) {
-    const bar = item.querySelector('.progress-bar');
-    bar.style.width = `${progress}%`;
-  }
+  if (item) item.querySelector('.progress-bar').style.width = `${progress}%`;
 }
 
 // --- Event Listeners ---
@@ -252,57 +229,24 @@ document.getElementById('btn-host').addEventListener('click', () => {
 document.getElementById('btn-join').addEventListener('click', () => {
   const id = joinIdInput.value.trim();
   if (!id) return;
-  
   initPeer();
-  peer.on('open', () => {
-    const connection = peer.connect(id);
-    setupConnection(connection);
-  });
+  peer.on('open', () => setupConnection(peer.connect(id)));
 });
 
-document.getElementById('btn-copy-id').addEventListener('click', () => {
-  navigator.clipboard.writeText(myId);
-  alert('Code copied to clipboard!');
-});
+document.getElementById('btn-cancel-host').addEventListener('click', resetToSetup);
+document.getElementById('btn-disconnect').addEventListener('click', resetToSetup);
 
-document.getElementById('btn-cancel-host').addEventListener('click', () => {
-  if (peer) peer.destroy();
-  resetToSetup();
-});
-
-document.getElementById('btn-disconnect').addEventListener('click', () => {
-  resetToSetup();
-});
-
-// Drag and Drop
-dropZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  dropZone.classList.add('dragging');
-});
-
-dropZone.addEventListener('dragleave', () => {
-  dropZone.classList.remove('dragging');
-});
-
-dropZone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  dropZone.classList.remove('dragging');
-  const files = e.dataTransfer.files;
-  handleFiles(files);
-});
-
-dropZone.addEventListener('click', () => {
-  fileInput.click();
-});
-
+dropZone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => {
-  handleFiles(fileInput.files);
+  Array.from(fileInput.files).forEach(sendFile);
+  fileInput.value = '';
 });
 
-function handleFiles(files) {
-  if (!conn || !conn.open) {
-    alert('Connect to a peer first!');
-    return;
+// Auto-join from URL hash
+window.addEventListener('load', () => {
+  const hashId = window.location.hash.substring(1);
+  if (hashId && hashId.length === 6) {
+    initPeer();
+    peer.on('open', () => setupConnection(peer.connect(hashId)));
   }
-  Array.from(files).forEach(sendFile);
-}
+});
