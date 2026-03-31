@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>P2PShare</string>
+    <key>CFBundleName</key>
+    <string>P2PShare</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Camera access is used to scan pairing QR codes.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Bluetooth is used for nearby pairing and discovery.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Location improves nearby device discovery on restricted networks.</string>
+    <key>NFCReaderUsageDescription</key>
+    <string>NFC is used for instant tap-to-pair setup.</string>
+</dict>
+</plist>

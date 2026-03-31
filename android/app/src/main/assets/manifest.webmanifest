@@ -1,0 +1,17 @@
+﻿{
+  "name": "P2PShare",
+  "short_name": "P2PShare",
+  "description": "Offline and online peer-to-peer file sharing with QR and room codes.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#dff4ef",
+  "theme_color": "#0d3f3a",
+  "icons": [
+    {
+      "src": "icon128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
