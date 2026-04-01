@@ -28,7 +28,9 @@
 
 html, body {
   height: 100%;
+  width: 100%;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 body {
@@ -168,6 +170,7 @@ main {
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 2px;
 }
 
@@ -455,6 +458,8 @@ input[type="text"]:focus {
   padding: 10px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(7, 69, 63, 0.1);
+  overflow: hidden;
+  width: 100%;
 }
 
 .transfer-head {
@@ -474,7 +479,8 @@ input[type="text"]:focus {
 
 .transfer-name {
   font-weight: 800;
-  max-width: 55%;
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -538,6 +544,20 @@ input[type="text"]:focus {
   color: var(--text-soft);
   display: flex;
   justify-content: space-between;
+  gap: 8px;
+}
+
+.transfer-status {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transfer-speed {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* ---- Footer ---- */
@@ -553,6 +573,28 @@ footer p {
 }
 
 /* ---- Animations ---- */
+@media (max-width: 300px) {
+  .transfer-head {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  
+  .transfer-name {
+    flex: 1 1 100%;
+    margin-bottom: 2px;
+    font-size: 0.74rem;
+  }
+  
+  .transfer-head-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .transfer-meta {
+    font-size: 0.7rem;
+  }
+}
+
 @keyframes pulseGlow {
   0% {
     box-shadow: 0 0 0 0 rgba(11, 106, 97, 0.35);

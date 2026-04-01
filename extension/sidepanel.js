@@ -24,10 +24,12 @@ const WEB_APP_URL = "https://connectvia.netlify.app";
 // Transfer config — matches web app
 const CHUNK_SIZE = 65536; // 64KB
 const CHANNEL_BUFFER_LIMIT = 2 * 1024 * 1024;
+const CONNECTION_TIMEOUT = 15000;
 
 // Transfer state
 const incomingTransfers = new Map();
 const outgoingTransfers = new Map();
+let connectionTimer = null;
 
 // --- Helpers ---
 
@@ -114,7 +116,20 @@ function generateQRCode(id) {
 function setupConnection(connection) {
   conn = connection;
 
+  // Start connection timeout — if 'open' doesn't fire in time, abort
+  clearTimeout(connectionTimer);
+  connectionTimer = setTimeout(() => {
+    if (!connection.open) {
+      alert('Connection timed out. The host may have closed their browser or the room expired.');
+      try { connection.close(); } catch (e) {}
+      conn = null;
+      resetToSetup();
+    }
+  }, CONNECTION_TIMEOUT);
+
   conn.on('open', () => {
+    clearTimeout(connectionTimer);
+    connectionTimer = null;
     showSection(shareSection);
     remotePeerIdEl.textContent = conn.peer;
     updateStatus('Connected', 'connected');
@@ -125,10 +140,12 @@ function setupConnection(connection) {
   });
 
   conn.on('close', () => {
+    clearTimeout(connectionTimer);
     resetToSetup();
   });
 
   conn.on('error', (err) => {
+    clearTimeout(connectionTimer);
     console.error('Connection error:', err);
     resetToSetup();
   });
@@ -166,6 +183,16 @@ function handleIncomingData(data) {
 
 function handleIncomingCancel(data) {
   const id = data.transferId;
+  // CRITICAL: Set cancelled flag on the record object BEFORE deleting.
+  // The sendFile() loop holds a local reference and checks record.cancelled.
+  const outRecord = outgoingTransfers.get(id);
+  if (outRecord) {
+    outRecord.cancelled = true;
+  }
+  const inRecord = incomingTransfers.get(id);
+  if (inRecord) {
+    inRecord.cancelled = true;
+  }
   incomingTransfers.delete(id);
   outgoingTransfers.delete(id);
   markTransferCancelled(id);
@@ -190,7 +217,7 @@ function handleIncomingFileStart(data) {
 
 function handleIncomingFileChunk(data) {
   const record = incomingTransfers.get(data.transferId);
-  if (!record) return;
+  if (!record || record.cancelled) return;
   if (record.chunks[data.index]) return;
 
   record.chunks[data.index] = data.chunk;
@@ -365,6 +392,10 @@ function cancelTransfer(id, direction) {
       outgoingTransfers.delete(id);
     }
   } else {
+    const record = incomingTransfers.get(id);
+    if (record) {
+      record.cancelled = true;
+    }
     incomingTransfers.delete(id);
   }
   if (conn && conn.open) {

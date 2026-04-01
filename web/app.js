@@ -9,6 +9,9 @@ const DEFAULT_CONFIG = {
 
 const STORAGE_KEY = 'connectvia_config_v2';
 const CHANNEL_BUFFER_LIMIT = 2 * 1024 * 1024;
+const CONNECTION_TIMEOUT = 15000;
+const RECONNECT_MAX_ATTEMPTS = 3;
+const RECONNECT_DELAY = 2000;
 
 const state = {
   peer: null,
@@ -21,6 +24,10 @@ const state = {
   incomingTransfers: new Map(),
   outgoingTransfers: new Map(),
   scannerActive: false,
+  connectionTimer: null,
+  reconnectAttempts: 0,
+  wasHosting: false,
+  lastRoomId: null,
 };
 
 const elements = {
@@ -324,6 +331,7 @@ function initPeer(preferredId = undefined) {
 
   state.peer.on('open', (id) => {
     state.myId = id;
+    state.reconnectAttempts = 0;
     elements.myPeerId.textContent = id;
     generateQRCode(id);
 
@@ -337,6 +345,8 @@ function initPeer(preferredId = undefined) {
       return;
     }
 
+    state.wasHosting = true;
+    state.lastRoomId = id;
     updateStatus('Waiting', 'waiting');
     logActivity(`Room ${id} is online and waiting.`);
   });
@@ -353,6 +363,12 @@ function initPeer(preferredId = undefined) {
 
   state.peer.on('error', (error) => {
     handlePeerError(error);
+  });
+
+  state.peer.on('disconnected', () => {
+    logActivity('Signaling connection lost. Attempting to reconnect...', 'Warning');
+    updateStatus('Reconnecting', 'waiting');
+    attemptReconnect();
   });
 
   state.peer.on('close', () => {
@@ -375,9 +391,36 @@ function handlePeerError(error) {
   resetToSetup({ destroyPeer: true });
 }
 
+function attemptReconnect() {
+  if (!state.peer || state.peer.destroyed) {
+    logActivity('Peer was destroyed. Cannot reconnect.', 'Warning');
+    return;
+  }
+
+  if (state.reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
+    logActivity(`Reconnection failed after ${RECONNECT_MAX_ATTEMPTS} attempts.`, 'Warning');
+    if (!state.conn || !state.conn.open) {
+      resetToSetup({ destroyPeer: true });
+    }
+    return;
+  }
+
+  state.reconnectAttempts += 1;
+  logActivity(`Reconnect attempt ${state.reconnectAttempts}/${RECONNECT_MAX_ATTEMPTS}...`);
+
+  try {
+    state.peer.reconnect();
+  } catch (error) {
+    console.warn('Reconnect call failed:', error);
+    setTimeout(() => attemptReconnect(), RECONNECT_DELAY);
+  }
+}
+
 function hostRoom() {
   const roomId = generateRoomCode();
   state.pendingJoinId = null;
+  state.wasHosting = true;
+  state.lastRoomId = roomId;
   showSection(elements.hostingSection);
   updateStatus('Creating room', 'waiting');
   logActivity(`Creating room ${roomId}.`);
@@ -401,7 +444,21 @@ function joinRoom(inputRoomId) {
 function setupConnection(connection, sourceLabel) {
   state.conn = connection;
 
+  // Start connection timeout — if 'open' doesn't fire in time, abort
+  clearTimeout(state.connectionTimer);
+  state.connectionTimer = setTimeout(() => {
+    if (!connection.open) {
+      logActivity('Connection timed out. The room may no longer be available.', 'Warning');
+      try { connection.close(); } catch (e) {}
+      state.conn = null;
+      alert('Connection timed out. The host may have closed their browser or the room expired. Please ask them to create a new room.');
+      resetToSetup({ destroyPeer: true });
+    }
+  }, CONNECTION_TIMEOUT);
+
   connection.on('open', () => {
+    clearTimeout(state.connectionTimer);
+    state.connectionTimer = null;
     showSection(elements.shareSection);
     elements.remotePeerId.textContent = connection.peer;
     updateStatus('Connected', 'connected');
@@ -414,11 +471,13 @@ function setupConnection(connection, sourceLabel) {
   });
 
   connection.on('close', () => {
+    clearTimeout(state.connectionTimer);
     logActivity('Peer disconnected.');
     resetToSetup({ destroyPeer: true });
   });
 
   connection.on('error', (error) => {
+    clearTimeout(state.connectionTimer);
     console.error('Data connection error:', error);
     logActivity('Data connection error.', 'Warning');
     resetToSetup({ destroyPeer: true });
@@ -559,6 +618,10 @@ function cancelTransfer(id, direction) {
       state.outgoingTransfers.delete(id);
     }
   } else {
+    const record = state.incomingTransfers.get(id);
+    if (record) {
+      record.cancelled = true;
+    }
     state.incomingTransfers.delete(id);
   }
 
@@ -658,6 +721,21 @@ function handleIncomingData(payload) {
 
 function handleIncomingCancel(payload) {
   const id = payload.transferId;
+
+  // CRITICAL: Set cancelled flag on the record object BEFORE deleting.
+  // The sendFile() loop holds a local reference to this object and checks
+  // record.cancelled — if we only delete from the Map without setting the
+  // flag, the loop's reference still sees cancelled === undefined and
+  // keeps pumping chunks.
+  const outRecord = state.outgoingTransfers.get(id);
+  if (outRecord) {
+    outRecord.cancelled = true;
+  }
+  const inRecord = state.incomingTransfers.get(id);
+  if (inRecord) {
+    inRecord.cancelled = true;
+  }
+
   state.incomingTransfers.delete(id);
   state.outgoingTransfers.delete(id);
   markTransferCancelled(id);
@@ -684,7 +762,7 @@ function handleIncomingFileStart(payload) {
 
 function handleIncomingFileChunk(payload) {
   const record = state.incomingTransfers.get(payload.transferId);
-  if (!record) return;
+  if (!record || record.cancelled) return;
 
   if (record.chunks[payload.index]) {
     return;
@@ -1132,6 +1210,19 @@ function initialize() {
   detectCapabilities();
   bindEvents();
   registerServiceWorker();
+
+  // Mobile tab suspension resilience: when user returns from WhatsApp etc.,
+  // check if the peer is still alive and reconnect if needed
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+
+    if (state.peer && !state.peer.destroyed && state.peer.disconnected) {
+      logActivity('Tab resumed. Reconnecting to signaling server...', 'System');
+      updateStatus('Reconnecting', 'waiting');
+      state.reconnectAttempts = 0;
+      attemptReconnect();
+    }
+  });
 
   const roomIdFromUrl = extractRoomId(window.location.href);
   if (roomIdFromUrl) {
