@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: connectvia-signal
+    env: node
+    plan: free
+    rootDir: signal-server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PEER_PATH
+        value: /peerjs
+      - key: CORS_ORIGIN
+        value: "*" # Set this to your Netlify URL later
