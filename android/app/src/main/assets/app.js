@@ -15,16 +15,17 @@ const STORAGE_KEY = 'sharevia_config_v1';
 const HISTORY_STORAGE_KEY = 'sharevia_transfer_history_v1';
 const CHANNEL_BUFFER_LIMIT = 2 * 1024 * 1024;
 const CONNECTION_TIMEOUT = 15000;
-const RECONNECT_MAX_ATTEMPTS = 3;
-const RECONNECT_DELAY = 2000;
+const RECONNECT_MAX_ATTEMPTS = 8;
+const RECONNECT_DELAY = 2500;
 const MAX_HISTORY_ENTRIES = 300;
 const MAX_RECEIVED_ARCHIVE_ITEMS = 300;
 const JSZIP_CDN_URL = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
 const DEFAULT_APP_DOWNLOAD_URL = 'https://play.google.com/store/apps/details?id=com.ShareVia.app';
+const TRANSIENT_PEER_ERROR_TYPES = new Set(['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected']);
 
 const state = {
   peer: null,
-  conn: null,
+  connections: new Map(),
   myId: '',
   pendingJoinId: null,
   html5QrCode: null,
@@ -33,10 +34,11 @@ const state = {
   incomingTransfers: new Map(),
   outgoingTransfers: new Map(),
   scannerActive: false,
-  connectionTimer: null,
+  connectionTimers: new Map(),
   reconnectAttempts: 0,
   wasHosting: false,
   lastRoomId: null,
+  lastJoinRoomId: null,
   dashboardMode: 'idle',
   radarActive: false,
   radarScanStartedAt: 0,
@@ -432,6 +434,50 @@ function createTransferId() {
   }
 
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getOpenConnections() {
+  return Array.from(state.connections.values()).filter((connection) => connection && connection.open);
+}
+
+function hasOpenConnections() {
+  return getOpenConnections().length > 0;
+}
+
+function hasAnyConnection() {
+  return state.connections.size > 0;
+}
+
+function makeTransferKey(peerId, transferId) {
+  return `${String(peerId || 'unknown')}::${String(transferId || '')}`;
+}
+
+function normalizePeerLabel(peerId) {
+  const raw = String(peerId || '').trim();
+  if (!raw) {
+    return 'Unknown peer';
+  }
+
+  return raw;
+}
+
+function updateConnectedPeersLabel() {
+  if (!elements.remotePeerId) {
+    return;
+  }
+
+  const openConnections = getOpenConnections();
+  if (!openConnections.length) {
+    elements.remotePeerId.textContent = '------';
+    return;
+  }
+
+  if (openConnections.length === 1) {
+    elements.remotePeerId.textContent = normalizePeerLabel(openConnections[0].peer);
+    return;
+  }
+
+  elements.remotePeerId.textContent = `${openConnections.length} peers`;
 }
 
 function hasNativeBridge() {
@@ -1011,20 +1057,89 @@ window.handleNativeBridgeMessage = function handleNativeBridgeMessage(payload) {
   }
 };
 
-function safeSend(payload) {
-  if (!state.conn || !state.conn.open) return false;
+function safeSendToConnection(connection, payload, options = {}) {
+  if (!connection || !connection.open) {
+    return false;
+  }
 
   try {
-    state.conn.send(payload);
+    connection.send(payload);
     return true;
   } catch (error) {
     console.error('Send failed:', error);
-    logActivity('Message send failed.', 'Warning');
+    if (!options.silent) {
+      logActivity(`Message send failed for ${normalizePeerLabel(connection.peer)}.`, 'Warning');
+    }
     return false;
   }
 }
 
+function getConnectionByPeer(peerId) {
+  const normalized = String(peerId || '').trim();
+  if (!normalized) {
+    return null;
+  }
+  return state.connections.get(normalized) || null;
+}
+
+function sendToPeer(peerId, payload, options = {}) {
+  const connection = getConnectionByPeer(peerId);
+  if (!connection || !connection.open) {
+    return false;
+  }
+
+  return safeSendToConnection(connection, payload, options);
+}
+
+function broadcastToConnections(payload, options = {}) {
+  const targets = getOpenConnections();
+  if (!targets.length) {
+    return false;
+  }
+
+  let sent = false;
+  targets.forEach((connection) => {
+    if (safeSendToConnection(connection, payload, options)) {
+      sent = true;
+    }
+  });
+  return sent;
+}
+
+function safeSend(payload, options = {}) {
+  return broadcastToConnections(payload, options);
+}
+
+function clearConnectionTimeout(peerId) {
+  const key = String(peerId || '').trim();
+  if (!key) {
+    return;
+  }
+
+  const timer = state.connectionTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+  }
+  state.connectionTimers.delete(key);
+}
+
+function closeAllConnections() {
+  state.connections.forEach((connection, peerId) => {
+    clearConnectionTimeout(peerId);
+    connection.__shareviaClosing = true;
+    try {
+      connection.close();
+    } catch (error) {
+      console.warn('Connection close failed', error);
+    }
+  });
+  state.connections.clear();
+  updateConnectedPeersLabel();
+}
+
 function initPeer(preferredId = undefined) {
+  closeAllConnections();
+
   if (state.peer) {
     try {
       state.peer.destroy();
@@ -1076,12 +1191,6 @@ function initPeer(preferredId = undefined) {
   });
 
   state.peer.on('connection', (incoming) => {
-    if (state.conn && state.conn.open) {
-      incoming.close();
-      logActivity(`Rejected extra connection from ${incoming.peer}.`, 'Warning');
-      return;
-    }
-
     setupConnection(incoming, 'Incoming');
   });
 
@@ -1100,18 +1209,82 @@ function initPeer(preferredId = undefined) {
   });
 }
 
+function isTransientPeerError(error) {
+  const type = String(error && error.type ? error.type : '').toLowerCase();
+  const message = String(error && error.message ? error.message : '').toLowerCase();
+  if (TRANSIENT_PEER_ERROR_TYPES.has(type)) {
+    return true;
+  }
+
+  return (
+    message.includes('lost connection') ||
+    message.includes('websocket') ||
+    message.includes('socket') ||
+    message.includes('network')
+  );
+}
+
+function recoverHostRoomAfterSignalLoss() {
+  if (!state.wasHosting || !state.lastRoomId) {
+    return false;
+  }
+
+  state.pendingJoinId = null;
+  showSection(elements.hostingSection);
+  updateStatus('Reconnecting', 'waiting');
+  logActivity(`Reopening sender room ${state.lastRoomId}...`, 'System');
+  initPeer(state.lastRoomId);
+  return true;
+}
+
+function recoverJoinRoomAfterSignalLoss() {
+  if (!state.lastJoinRoomId) {
+    return false;
+  }
+
+  state.pendingJoinId = state.lastJoinRoomId;
+  showSection(elements.setupSection);
+  updateStatus('Reconnecting', 'waiting');
+  logActivity(`Rejoining room ${state.lastJoinRoomId}...`, 'System');
+  initPeer();
+  return true;
+}
+
 function handlePeerError(error) {
   console.error('Peer error:', error);
 
   if (error && error.type === 'peer-unavailable') {
     alert('Room was not found or is offline. Ask sender to keep ShareVia open and share a new code/link.');
     logActivity('Room unavailable or offline.', 'Warning');
-  } else {
-    const type = error && error.type ? error.type : 'unknown';
-    alert(`Connection error: ${type}`);
-    logActivity(`Peer error: ${type}`, 'Warning');
+    resetToSetup({ destroyPeer: true });
+    return;
   }
 
+  if (isTransientPeerError(error)) {
+    logActivity('Signaling connection interrupted. Attempting automatic recovery...', 'Warning');
+    updateStatus('Reconnecting', 'waiting');
+
+    if (state.peer && !state.peer.destroyed) {
+      attemptReconnect();
+      return;
+    }
+
+    if (recoverHostRoomAfterSignalLoss()) {
+      return;
+    }
+
+    if (recoverJoinRoomAfterSignalLoss()) {
+      return;
+    }
+
+    logActivity('Could not recover session automatically. Please reconnect.', 'Warning');
+    resetToSetup({ destroyPeer: true });
+    return;
+  }
+
+  const type = error && error.type ? error.type : 'unknown';
+  alert(`Connection error: ${type}`);
+  logActivity(`Peer error: ${type}`, 'Warning');
   resetToSetup({ destroyPeer: true });
 }
 
@@ -1123,7 +1296,17 @@ function attemptReconnect() {
 
   if (state.reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
     logActivity(`Reconnection failed after ${RECONNECT_MAX_ATTEMPTS} attempts.`, 'Warning');
-    if (!state.conn || !state.conn.open) {
+    if (!hasOpenConnections()) {
+      if (recoverHostRoomAfterSignalLoss()) {
+        return;
+      }
+
+      if (recoverJoinRoomAfterSignalLoss()) {
+        return;
+      }
+    }
+
+    if (!hasOpenConnections()) {
       resetToSetup({ destroyPeer: true });
     }
     return;
@@ -1151,6 +1334,7 @@ function hostRoom() {
   const roomId = generateRoomCode();
   state.dashboardMode = 'send';
   state.pendingJoinId = null;
+  state.lastJoinRoomId = null;
   state.wasHosting = true;
   state.lastRoomId = roomId;
   stopOfflineRadarDiscovery();
@@ -1170,7 +1354,7 @@ function beginSendDiscovery() {
     return;
   }
 
-  if (state.conn && state.conn.open) {
+  if (hasAnyConnection()) {
     alert('Already connected. Disconnect current session first.');
     return;
   }
@@ -1178,6 +1362,7 @@ function beginSendDiscovery() {
   const roomId = generateRoomCode();
   state.dashboardMode = 'send';
   state.pendingJoinId = null;
+  state.lastJoinRoomId = null;
   state.wasHosting = true;
   state.lastRoomId = roomId;
 
@@ -1199,7 +1384,7 @@ function beginReceiveDiscovery() {
     return;
   }
 
-  if (state.conn && state.conn.open) {
+  if (hasAnyConnection()) {
     alert('Already connected. Disconnect current session first.');
     return;
   }
@@ -1247,60 +1432,158 @@ function joinRoom(inputRoomId) {
 
   state.dashboardMode = 'receive';
   state.pendingJoinId = roomId;
+  state.lastJoinRoomId = roomId;
+  state.wasHosting = false;
   updateStatus('Preparing', 'waiting');
   logActivity(`Preparing to join room ${roomId}.`);
   initPeer();
 }
 
-function setupConnection(connection, sourceLabel) {
-  state.conn = connection;
+function clearTransfersForPeer(peerId) {
+  const normalizedPeerId = String(peerId || '').trim();
+  if (!normalizedPeerId) {
+    return;
+  }
 
-  // Start connection timeout — if 'open' doesn't fire in time, abort
-  clearTimeout(state.connectionTimer);
-  state.connectionTimer = setTimeout(() => {
-    if (!connection.open) {
-      logActivity('Connection timed out. The room may no longer be available.', 'Warning');
-      try { connection.close(); } catch (e) {}
-      state.conn = null;
-      alert('Connection timed out. The host may have closed their browser or the room expired. Please ask them to create a new room.');
-      resetToSetup({ destroyPeer: true });
+  state.outgoingTransfers.forEach((record, transferKey) => {
+    if (record && record.peerId === normalizedPeerId) {
+      record.cancelled = true;
+      state.outgoingTransfers.delete(transferKey);
+      markTransferCancelled(transferKey);
     }
-  }, CONNECTION_TIMEOUT);
-
-  connection.on('open', () => {
-    clearTimeout(state.connectionTimer);
-    state.connectionTimer = null;
-    showSection(elements.shareSection);
-    elements.remotePeerId.textContent = connection.peer;
-    updateStatus('Connected', 'connected');
-    logActivity(`${sourceLabel} connection open with ${connection.peer}.`);
-    stopOfflineRadarDiscovery();
-    invokeNativeAction('startTransferService', {}, { silentIfUnavailable: true });
-    announceCapabilities();
   });
 
-  connection.on('data', (payload) => {
-    handleIncomingData(payload);
-  });
-
-  connection.on('close', () => {
-    clearTimeout(state.connectionTimer);
-    logActivity('Peer disconnected. Realtime transfer requires sender to stay online.', 'Warning');
-    invokeNativeAction('stopTransferService', {}, { silentIfUnavailable: true });
-    resetToSetup({ destroyPeer: true });
-  });
-
-  connection.on('error', (error) => {
-    clearTimeout(state.connectionTimer);
-    console.error('Data connection error:', error);
-    logActivity('Data connection error.', 'Warning');
-    invokeNativeAction('stopTransferService', {}, { silentIfUnavailable: true });
-    resetToSetup({ destroyPeer: true });
+  state.incomingTransfers.forEach((record, transferKey) => {
+    if (record && record.peerId === normalizedPeerId) {
+      record.cancelled = true;
+      state.incomingTransfers.delete(transferKey);
+      markTransferCancelled(transferKey);
+    }
   });
 }
 
-function announceCapabilities() {
-  safeSend({
+function handlePeerConnectionClosed(peerId, options = {}) {
+  const normalizedPeerId = String(peerId || '').trim();
+  if (normalizedPeerId) {
+    state.connections.delete(normalizedPeerId);
+    clearConnectionTimeout(normalizedPeerId);
+    clearTransfersForPeer(normalizedPeerId);
+  }
+
+  updateConnectedPeersLabel();
+
+  const openCount = getOpenConnections().length;
+  if (openCount > 0) {
+    updateStatus('Connected', 'connected');
+    logActivity(`${normalizePeerLabel(peerId)} disconnected. ${openCount} peer(s) still connected.`, 'Warning');
+    return;
+  }
+
+  invokeNativeAction('stopTransferService', {}, { silentIfUnavailable: true });
+
+  if (state.wasHosting && state.peer && !state.peer.destroyed && state.myId) {
+    showSection(elements.hostingSection);
+    updateStatus('Waiting', 'waiting');
+    logActivity('All peers disconnected. Room is still open for new connections.', 'System');
+    return;
+  }
+
+  if (options.showSenderOfflineHint !== false) {
+    logActivity('Peer disconnected. Realtime transfer requires sender to stay online.', 'Warning');
+  }
+  resetToSetup({ destroyPeer: true });
+}
+
+function setupConnection(connection, sourceLabel) {
+  const peerId = String(connection && connection.peer ? connection.peer : '').trim();
+  if (!peerId) {
+    try {
+      connection.close();
+    } catch (error) {
+      console.warn('Unnamed connection close failed', error);
+    }
+    return;
+  }
+
+  const existing = state.connections.get(peerId);
+  if (existing && existing !== connection) {
+    try {
+      existing.close();
+    } catch (error) {
+      console.warn('Previous connection close failed', error);
+    }
+  }
+
+  state.connections.set(peerId, connection);
+  updateConnectedPeersLabel();
+
+  clearConnectionTimeout(peerId);
+  const timer = setTimeout(() => {
+    if (connection.__shareviaClosing) {
+      return;
+    }
+    if (!connection.open) {
+      logActivity(`Connection to ${normalizePeerLabel(peerId)} timed out.`, 'Warning');
+      try {
+        connection.close();
+      } catch (error) {
+        console.warn('Connection timeout close failed', error);
+      }
+      finalizeConnection(false);
+      if (!state.wasHosting) {
+        alert('Connection timed out. The host may have closed their app or the room expired. Please ask for a new room code.');
+      }
+    }
+  }, CONNECTION_TIMEOUT);
+  state.connectionTimers.set(peerId, timer);
+
+  let finalized = false;
+  const finalizeConnection = (showSenderOfflineHint = true) => {
+    if (finalized) {
+      return;
+    }
+    finalized = true;
+    if (connection.__shareviaClosing) {
+      state.connections.delete(peerId);
+      clearConnectionTimeout(peerId);
+      return;
+    }
+    handlePeerConnectionClosed(peerId, { showSenderOfflineHint });
+  };
+
+  connection.on('open', () => {
+    connection.__shareviaClosing = false;
+    clearConnectionTimeout(peerId);
+    state.connections.set(peerId, connection);
+    showSection(elements.shareSection);
+    updateConnectedPeersLabel();
+    updateStatus('Connected', 'connected');
+    const openCount = getOpenConnections().length;
+    logActivity(`${sourceLabel} connection open with ${normalizePeerLabel(peerId)}${openCount > 1 ? ` (${openCount} peers connected)` : ''}.`);
+    stopOfflineRadarDiscovery();
+    invokeNativeAction('startTransferService', {}, { silentIfUnavailable: true });
+    announceCapabilities(peerId);
+  });
+
+  connection.on('data', (payload) => {
+    handleIncomingData(payload, peerId);
+  });
+
+  connection.on('close', () => {
+    clearConnectionTimeout(peerId);
+    finalizeConnection(true);
+  });
+
+  connection.on('error', (error) => {
+    clearConnectionTimeout(peerId);
+    console.error('Data connection error:', error);
+    logActivity(`Data connection error with ${normalizePeerLabel(peerId)}.`, 'Warning');
+    finalizeConnection(false);
+  });
+}
+
+function announceCapabilities(targetPeerId = null) {
+  const payload = {
     type: 'capabilities',
     data: {
       webrtc: Boolean(window.RTCPeerConnection),
@@ -1309,9 +1592,15 @@ function announceCapabilities() {
       geolocation: Boolean(navigator.geolocation),
       nativeBridge: hasNativeBridge(),
     },
-  });
-}
+  };
 
+  if (targetPeerId) {
+    sendToPeer(targetPeerId, payload, { silent: true });
+    return;
+  }
+
+  broadcastToConnections(payload, { silent: true });
+}
 function resetToSetup(options = {}) {
   const destroyPeer = options.destroyPeer !== false;
 
@@ -1321,6 +1610,9 @@ function resetToSetup(options = {}) {
   try {
     state.dashboardMode = 'idle';
     state.radarActive = false;
+    state.wasHosting = false;
+    state.lastRoomId = null;
+    state.lastJoinRoomId = null;
     clearNearbyDevices();
     setElementHidden(elements.radarPanel, true);
     updateRadarModeUI();
@@ -1333,15 +1625,7 @@ function resetToSetup(options = {}) {
     invokeNativeAction('stopPairing', {}, { silentIfUnavailable: true });
     invokeNativeAction('setRoomContext', { roomCode: '', role: 'idle', targetRoom: '' }, { silentIfUnavailable: true });
 
-    if (state.conn) {
-      const active = state.conn;
-      state.conn = null;
-      try {
-        active.close();
-      } catch (error) {
-        console.warn('Connection close failed', error);
-      }
-    }
+    closeAllConnections();
 
     if (destroyPeer && state.peer) {
       try {
@@ -1356,6 +1640,7 @@ function resetToSetup(options = {}) {
     state.pendingJoinId = null;
     state.incomingTransfers.clear();
     state.outgoingTransfers.clear();
+    state.connectionTimers.clear();
 
     elements.transferList.innerHTML = '';
     elements.noteInbox.innerHTML = '';
@@ -1440,24 +1725,33 @@ function createTransferUI(id, name, size, direction, timestamp = Date.now()) {
 }
 
 function cancelTransfer(id, direction) {
+  let targetPeerId = '';
+  let rawTransferId = id;
+
   if (direction === 'outgoing') {
     const record = state.outgoingTransfers.get(id);
     if (record) {
       record.cancelled = true;
+      targetPeerId = record.peerId || '';
+      rawTransferId = record.transferId || id;
       state.outgoingTransfers.delete(id);
     }
   } else {
     const record = state.incomingTransfers.get(id);
     if (record) {
       record.cancelled = true;
+      targetPeerId = record.peerId || '';
+      rawTransferId = record.transferId || id;
     }
     state.incomingTransfers.delete(id);
   }
 
-  safeSend({ type: 'file-cancel', transferId: id });
+  if (targetPeerId) {
+    sendToPeer(targetPeerId, { type: 'file-cancel', transferId: rawTransferId }, { silent: true });
+  }
 
   markTransferCancelled(id);
-  logActivity(`Transfer cancelled.`);
+  logActivity(`Transfer cancelled${targetPeerId ? ` for ${normalizePeerLabel(targetPeerId)}` : ''}.`);
 }
 
 function markTransferCancelled(id) {
@@ -1518,27 +1812,27 @@ function addDownloadAction(id, url, fileName) {
   item.appendChild(button);
 }
 
-function handleIncomingData(payload) {
+function handleIncomingData(payload, fromPeerId = '') {
   if (!payload || typeof payload !== 'object') return;
 
   switch (payload.type) {
     case 'file-start':
-      handleIncomingFileStart(payload);
+      handleIncomingFileStart(payload, fromPeerId);
       break;
     case 'file-chunk':
-      handleIncomingFileChunk(payload);
+      handleIncomingFileChunk(payload, fromPeerId);
       break;
     case 'file-end':
-      handleIncomingFileEnd(payload);
+      handleIncomingFileEnd(payload, fromPeerId);
       break;
     case 'file-ack':
-      handleIncomingAck(payload);
+      handleIncomingAck(payload, fromPeerId);
       break;
     case 'file-cancel':
-      handleIncomingCancel(payload);
+      handleIncomingCancel(payload, fromPeerId);
       break;
     case 'text-note':
-      handleIncomingNote(payload);
+      handleIncomingNote(payload, fromPeerId);
       break;
     case 'capabilities':
       logActivity('Remote device capabilities received.');
@@ -1548,32 +1842,34 @@ function handleIncomingData(payload) {
   }
 }
 
-function handleIncomingCancel(payload) {
-  const id = payload.transferId;
+function handleIncomingCancel(payload, fromPeerId = '') {
+  const transferId = String(payload.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
 
-  // CRITICAL: Set cancelled flag on the record object BEFORE deleting.
-  // The sendFile() loop holds a local reference to this object and checks
-  // record.cancelled — if we only delete from the Map without setting the
-  // flag, the loop's reference still sees cancelled === undefined and
-  // keeps pumping chunks.
-  const outRecord = state.outgoingTransfers.get(id);
+  const outRecord = state.outgoingTransfers.get(transferKey);
   if (outRecord) {
     outRecord.cancelled = true;
   }
-  const inRecord = state.incomingTransfers.get(id);
+  const inRecord = state.incomingTransfers.get(transferKey);
   if (inRecord) {
     inRecord.cancelled = true;
   }
 
-  state.incomingTransfers.delete(id);
-  state.outgoingTransfers.delete(id);
-  markTransferCancelled(id);
-  logActivity('Remote peer cancelled a transfer.');
+  state.incomingTransfers.delete(transferKey);
+  state.outgoingTransfers.delete(transferKey);
+  markTransferCancelled(transferKey);
+  logActivity(`Remote peer cancelled a transfer${fromPeerId ? ` (${normalizePeerLabel(fromPeerId)})` : ''}.`);
 }
 
-function handleIncomingFileStart(payload) {
+function handleIncomingFileStart(payload, fromPeerId = '') {
+  const transferId = String(payload.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
+  const fromLabel = normalizePeerLabel(fromPeerId);
   const record = {
-    transferId: payload.transferId,
+    transferId,
+    peerId: fromPeerId,
     name: payload.name,
     size: Number(payload.size),
     mime: payload.mime || 'application/octet-stream',
@@ -1585,13 +1881,16 @@ function handleIncomingFileStart(payload) {
     chunks: new Array(Number(payload.totalChunks)),
   };
 
-  state.incomingTransfers.set(payload.transferId, record);
-  createTransferUI(payload.transferId, payload.name, payload.size, 'incoming', record.startedAt);
-  logActivity(`Receiving file: ${payload.name}`);
+  state.incomingTransfers.set(transferKey, record);
+  createTransferUI(transferKey, `${payload.name} from ${fromLabel}`, payload.size, 'incoming', record.startedAt);
+  logActivity(`Receiving file: ${payload.name} from ${fromLabel}`);
 }
 
-function handleIncomingFileChunk(payload) {
-  const record = state.incomingTransfers.get(payload.transferId);
+function handleIncomingFileChunk(payload, fromPeerId = '') {
+  const transferId = String(payload.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
+  const record = state.incomingTransfers.get(transferKey);
   if (!record || record.cancelled) return;
 
   if (record.chunks[payload.index]) {
@@ -1604,7 +1903,7 @@ function handleIncomingFileChunk(payload) {
 
   const progress = (record.receivedBytes / record.size) * 100;
   updateTransferProgress(
-    payload.transferId,
+    transferKey,
     progress,
     record.receivedBytes,
     record.size,
@@ -1613,17 +1912,20 @@ function handleIncomingFileChunk(payload) {
   );
 
   if (record.receivedChunks % state.config.ackEvery === 0 || record.receivedChunks === record.totalChunks) {
-    safeSend({
+    sendToPeer(fromPeerId, {
       type: 'file-ack',
-      transferId: payload.transferId,
+      transferId,
       receivedChunks: record.receivedChunks,
       receivedBytes: record.receivedBytes,
-    });
+    }, { silent: true });
   }
 }
 
-function handleIncomingFileEnd(payload) {
-  const record = state.incomingTransfers.get(payload.transferId);
+function handleIncomingFileEnd(payload, fromPeerId = '') {
+  const transferId = String(payload.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
+  const record = state.incomingTransfers.get(transferKey);
   if (!record) return;
 
   if (record.receivedChunks !== record.totalChunks) {
@@ -1643,11 +1945,11 @@ function handleIncomingFileEnd(payload) {
 
   const blob = new Blob(chunks, { type: record.mime });
   const url = URL.createObjectURL(blob);
-  addDownloadAction(payload.transferId, url, record.name);
+  addDownloadAction(transferKey, url, record.name);
   pushReceivedArchiveItem(record.name, blob, Date.now());
-  updateTransferProgress(payload.transferId, 100, record.size, record.size, record.startTs, 'Received');
-  markTransferComplete(payload.transferId, `Received (${formatBytes(record.size)}) at ${formatClockTime(Date.now())}`);
-  logActivity(`Received file: ${record.name}`);
+  updateTransferProgress(transferKey, 100, record.size, record.size, record.startTs, 'Received');
+  markTransferComplete(transferKey, `Received (${formatBytes(record.size)}) at ${formatClockTime(Date.now())}`);
+  logActivity(`Received file: ${record.name}${fromPeerId ? ` from ${normalizePeerLabel(fromPeerId)}` : ''}`);
   addTransferHistoryEntry({
     direction: 'received',
     name: record.name,
@@ -1655,18 +1957,21 @@ function handleIncomingFileEnd(payload) {
     status: 'Completed',
     timestamp: Date.now(),
   });
-  state.incomingTransfers.delete(payload.transferId);
+  state.incomingTransfers.delete(transferKey);
 }
 
-function handleIncomingAck(payload) {
-  const transfer = state.outgoingTransfers.get(payload.transferId);
+function handleIncomingAck(payload, fromPeerId = '') {
+  const transferId = String(payload.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
+  const transfer = state.outgoingTransfers.get(transferKey);
   if (!transfer) return;
 
   transfer.ackedBytes = payload.receivedBytes;
   const progress = (payload.receivedBytes / transfer.size) * 100;
 
   updateTransferProgress(
-    payload.transferId,
+    transferKey,
     progress,
     payload.receivedBytes,
     transfer.size,
@@ -1675,10 +1980,11 @@ function handleIncomingAck(payload) {
   );
 }
 
-function handleIncomingNote(payload) {
+function handleIncomingNote(payload, fromPeerId = '') {
   if (!payload.text) return;
-  addNoteToInbox(payload.text, false);
-  logActivity('Text note received.');
+  const fromLabel = normalizePeerLabel(fromPeerId);
+  addNoteToInbox(`${fromLabel}: ${payload.text}`, false);
+  logActivity(`Text note received from ${fromLabel}.`);
 }
 
 function addNoteToInbox(text, isSelf) {
@@ -1688,8 +1994,8 @@ function addNoteToInbox(text, isSelf) {
   elements.noteInbox.prepend(item);
 }
 
-async function waitForBufferSpace() {
-  const channel = state.conn && state.conn.dataChannel ? state.conn.dataChannel : null;
+async function waitForBufferSpace(connection) {
+  const channel = connection && connection.dataChannel ? connection.dataChannel : null;
 
   if (!channel) {
     return;
@@ -1707,13 +2013,13 @@ function sleep(ms) {
 }
 
 async function sendSelectedFiles(fileList, items, options = {}) {
-  if (!state.conn || !state.conn.open) {
-    alert('Connect to a room before sending files.');
+  if (!hasOpenConnections()) {
+    alert('Connect to at least one device before sending files.');
     return;
   }
 
   const fileEntries = [];
-  
+
   if (items && items.length > 0) {
     for (const item of items) {
       const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
@@ -1754,6 +2060,28 @@ async function sendSelectedFiles(fileList, items, options = {}) {
   }
 }
 
+function recoverSessionOnResume() {
+  if (hasOpenConnections()) {
+    return;
+  }
+
+  if (state.peer && !state.peer.destroyed) {
+    if (state.peer.disconnected) {
+      logActivity('Tab resumed. Reconnecting to signaling server...', 'System');
+      updateStatus('Reconnecting', 'waiting');
+      state.reconnectAttempts = 0;
+      attemptReconnect();
+    }
+    return;
+  }
+
+  if (recoverHostRoomAfterSignalLoss()) {
+    return;
+  }
+
+  recoverJoinRoomAfterSignalLoss();
+}
+
 async function readDirectoryEntries(entry) {
   const reader = entry.createReader();
   const entries = [];
@@ -1783,12 +2111,23 @@ async function getFilesFromEntry(entry, fileEntries, parentPath = '') {
   }
 }
 
-async function sendFile(file, options = {}) {
+async function sendFileToPeer(connection, file, options = {}) {
+  if (!connection || !connection.open) {
+    return;
+  }
+
+  const peerId = String(connection.peer || '').trim();
+  const peerLabel = normalizePeerLabel(peerId);
   const transferId = createTransferId();
+  const transferKey = makeTransferKey(peerId, transferId);
   const totalChunks = Math.ceil(file.size / state.config.chunkSize);
   const startedAt = Date.now();
+  const transferName = options.fanoutCount > 1 ? `${file.name} -> ${peerLabel}` : file.name;
+
   const transferRecord = {
-    id: transferId,
+    id: transferKey,
+    transferId,
+    peerId,
     size: file.size,
     sentBytes: 0,
     ackedBytes: 0,
@@ -1797,10 +2136,10 @@ async function sendFile(file, options = {}) {
     totalChunks,
   };
 
-  state.outgoingTransfers.set(transferId, transferRecord);
-  createTransferUI(transferId, file.name, file.size, 'outgoing', startedAt);
+  state.outgoingTransfers.set(transferKey, transferRecord);
+  createTransferUI(transferKey, transferName, file.size, 'outgoing', startedAt);
 
-  safeSend({
+  const started = safeSendToConnection(connection, {
     type: 'file-start',
     transferId,
     name: file.name,
@@ -1810,36 +2149,48 @@ async function sendFile(file, options = {}) {
     totalChunks,
   });
 
+  if (!started) {
+    transferRecord.cancelled = true;
+    markTransferCancelled(transferKey);
+    return;
+  }
+
   let offset = 0;
 
   for (let index = 0; index < totalChunks; index += 1) {
-    if (transferRecord.cancelled) {
-      markTransferCancelled(transferId);
+    if (transferRecord.cancelled || !connection.open) {
+      markTransferCancelled(transferKey);
       return;
     }
 
     const end = Math.min(offset + state.config.chunkSize, file.size);
     const chunk = await file.slice(offset, end).arrayBuffer();
 
-    await waitForBufferSpace();
+    await waitForBufferSpace(connection);
 
-    if (transferRecord.cancelled) {
-      markTransferCancelled(transferId);
+    if (transferRecord.cancelled || !connection.open) {
+      markTransferCancelled(transferKey);
       return;
     }
 
-    safeSend({
+    const sent = safeSendToConnection(connection, {
       type: 'file-chunk',
       transferId,
       index,
       chunk,
-    });
+    }, { silent: true });
+
+    if (!sent) {
+      transferRecord.cancelled = true;
+      markTransferCancelled(transferKey);
+      return;
+    }
 
     offset = end;
     transferRecord.sentBytes = offset;
 
     updateTransferProgress(
-      transferId,
+      transferKey,
       (offset / file.size) * 100,
       transferRecord.sentBytes,
       file.size,
@@ -1852,21 +2203,34 @@ async function sendFile(file, options = {}) {
     }
   }
 
-  safeSend({
+  safeSendToConnection(connection, {
     type: 'file-end',
     transferId,
-  });
+  }, { silent: true });
 
   const statusSuffix = options.bundledFromFolder ? 'Folder archive sent' : 'Sent';
-  markTransferComplete(transferId, `${statusSuffix} (${formatBytes(file.size)}) at ${formatClockTime(Date.now())}`);
-  logActivity(`Sent file: ${file.name}`);
+  markTransferComplete(transferKey, `${statusSuffix} (${formatBytes(file.size)}) at ${formatClockTime(Date.now())}`);
+  logActivity(`Sent file: ${file.name} to ${peerLabel}`);
   addTransferHistoryEntry({
     direction: 'sent',
-    name: file.name,
+    name: transferName,
     size: file.size,
     status: 'Completed',
     timestamp: Date.now(),
   });
+}
+
+async function sendFile(file, options = {}) {
+  const targets = getOpenConnections();
+  if (!targets.length) {
+    alert('Connect to at least one device before sending files.');
+    return;
+  }
+
+  await Promise.all(targets.map((connection) => sendFileToPeer(connection, file, {
+    ...options,
+    fanoutCount: targets.length,
+  })));
 }
 
 function queueNote() {
@@ -1875,7 +2239,8 @@ function queueNote() {
     return;
   }
 
-  if (!state.conn || !state.conn.open) {
+  const openCount = getOpenConnections().length;
+  if (!openCount) {
     alert('Connect first to send notes.');
     return;
   }
@@ -1883,11 +2248,11 @@ function queueNote() {
   safeSend({
     type: 'text-note',
     text,
-  });
+  }, { silent: true });
 
-  addNoteToInbox(text, true);
+  addNoteToInbox(`You: ${text}`, true);
   elements.textNote.value = '';
-  logActivity('Text note sent.');
+  logActivity(`Text note sent to ${openCount} peer(s).`);
 }
 
 function generateQRCode(roomId) {
@@ -2151,13 +2516,7 @@ function initialize() {
   // check if the peer is still alive and reconnect if needed
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
-
-    if (state.peer && !state.peer.destroyed && state.peer.disconnected) {
-      logActivity('Tab resumed. Reconnecting to signaling server...', 'System');
-      updateStatus('Reconnecting', 'waiting');
-      state.reconnectAttempts = 0;
-      attemptReconnect();
-    }
+    recoverSessionOnResume();
   });
 
   const roomIdFromUrl = extractRoomId(window.location.href);
@@ -2176,4 +2535,7 @@ if (document.readyState === 'loading') {
 } else {
   initialize();
 }
+
+
+
 

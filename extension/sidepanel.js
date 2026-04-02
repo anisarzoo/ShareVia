@@ -1,6 +1,9 @@
 let peer = null;
-let conn = null;
 let myId = null;
+let pendingJoinId = null;
+let hostingMode = false;
+const connections = new Map();
+const connectionTimers = new Map();
 
 // DOM Elements
 const setupSection = document.getElementById('setup-section');
@@ -38,7 +41,7 @@ const CONNECTION_TIMEOUT = 15000;
 // Transfer state
 const incomingTransfers = new Map();
 const outgoingTransfers = new Map();
-let connectionTimer = null;
+let isResetting = false;
 
 // --- Helpers ---
 
@@ -68,10 +71,91 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function normalizePeerLabel(peerId) {
+  const raw = String(peerId || '').trim();
+  return raw || 'Unknown peer';
+}
+
+function makeTransferKey(peerId, transferId) {
+  return `${String(peerId || 'unknown')}::${String(transferId || '')}`;
+}
+
+function getOpenConnections() {
+  return Array.from(connections.values()).filter((connection) => connection && connection.open);
+}
+
+function hasOpenConnections() {
+  return getOpenConnections().length > 0;
+}
+
+function updateConnectedLabel() {
+  const open = getOpenConnections();
+  if (!open.length) {
+    remotePeerIdEl.textContent = '------';
+    return;
+  }
+
+  if (open.length === 1) {
+    remotePeerIdEl.textContent = normalizePeerLabel(open[0].peer);
+    return;
+  }
+
+  remotePeerIdEl.textContent = `${open.length} peers`;
+}
+
+function safeSendToConnection(connection, payload) {
+  if (!connection || !connection.open) return false;
+  try {
+    connection.send(payload);
+    return true;
+  } catch (error) {
+    console.error('Send failed:', error);
+    return false;
+  }
+}
+
+function sendToPeer(peerId, payload) {
+  const key = String(peerId || '').trim();
+  if (!key) return false;
+  const connection = connections.get(key);
+  return safeSendToConnection(connection, payload);
+}
+
+function clearConnectionTimeout(peerId) {
+  const key = String(peerId || '').trim();
+  if (!key) return;
+  const timer = connectionTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+  }
+  connectionTimers.delete(key);
+}
+
+function closeAllConnections() {
+  connections.forEach((connection, peerId) => {
+    clearConnectionTimeout(peerId);
+    connection.__shareviaClosing = true;
+    try {
+      connection.close();
+    } catch (error) {
+      console.warn('Connection close failed:', error);
+    }
+  });
+  connections.clear();
+  updateConnectedLabel();
+}
+
 // --- Initialization ---
 
 function initPeer(id = null) {
-  if (peer) peer.destroy();
+  closeAllConnections();
+  if (peer) {
+    try {
+      peer.destroy();
+    } catch (error) {
+      console.warn('Peer destroy failed:', error);
+    }
+  }
 
   const peerId = id || generateRoomCode();
   peer = new Peer(peerId, SIGNAL_CONFIG);
@@ -79,16 +163,22 @@ function initPeer(id = null) {
   peer.on('open', (openId) => {
     myId = openId;
     myPeerIdEl.textContent = openId;
-    updateStatus('Waiting', 'waiting');
     generateQRCode(openId);
+
+    if (pendingJoinId) {
+      const target = pendingJoinId;
+      pendingJoinId = null;
+      updateStatus('Connecting', 'waiting');
+      const outgoing = peer.connect(target, { reliable: true });
+      setupConnection(outgoing, 'Outgoing');
+      return;
+    }
+
+    updateStatus('Waiting', 'waiting');
   });
 
   peer.on('connection', (connection) => {
-    if (conn && conn.open) {
-      connection.close();
-      return;
-    }
-    setupConnection(connection);
+    setupConnection(connection, 'Incoming');
   });
 
   peer.on('error', (err) => {
@@ -96,13 +186,24 @@ function initPeer(id = null) {
     if (err && err.type === 'peer-unavailable') {
       alert('Room not found. Check the code and try again.');
     } else {
-      alert('Connection error: ' + (err.type || 'unknown'));
+      alert(`Connection error: ${err && err.type ? err.type : 'unknown'}`);
     }
-    resetToSetup();
+    resetToSetup({ destroyPeer: true });
   });
 
   peer.on('disconnected', () => {
-    updateStatus('Disconnected', 'disconnected');
+    updateStatus('Reconnecting', 'waiting');
+    try {
+      peer.reconnect();
+    } catch (error) {
+      console.warn('Peer reconnect failed:', error);
+    }
+  });
+
+  peer.on('close', () => {
+    if (!hasOpenConnections()) {
+      updateStatus('Disconnected', 'disconnected');
+    }
   });
 }
 
@@ -122,94 +223,188 @@ function generateQRCode(id) {
 
 // --- Connection ---
 
-function setupConnection(connection) {
-  conn = connection;
+function clearTransfersForPeer(peerId) {
+  const key = String(peerId || '').trim();
+  if (!key) return;
 
-  // Start connection timeout — if 'open' doesn't fire in time, abort
-  clearTimeout(connectionTimer);
-  connectionTimer = setTimeout(() => {
+  outgoingTransfers.forEach((record, transferKey) => {
+    if (record && record.peerId === key) {
+      record.cancelled = true;
+      outgoingTransfers.delete(transferKey);
+      markTransferCancelled(transferKey);
+    }
+  });
+
+  incomingTransfers.forEach((record, transferKey) => {
+    if (record && record.peerId === key) {
+      record.cancelled = true;
+      incomingTransfers.delete(transferKey);
+      markTransferCancelled(transferKey);
+    }
+  });
+}
+
+function handleConnectionClosed(peerId) {
+  const key = String(peerId || '').trim();
+  if (key) {
+    connections.delete(key);
+    clearConnectionTimeout(key);
+    clearTransfersForPeer(key);
+  }
+
+  updateConnectedLabel();
+
+  const openCount = getOpenConnections().length;
+  if (openCount > 0) {
+    updateStatus('Connected', 'connected');
+    return;
+  }
+
+  if (hostingMode && peer && !peer.destroyed && myId) {
+    showSection(hostingSection);
+    updateStatus('Waiting', 'waiting');
+    return;
+  }
+
+  resetToSetup({ destroyPeer: true });
+}
+
+function setupConnection(connection, sourceLabel = 'Incoming') {
+  const peerId = String(connection && connection.peer ? connection.peer : '').trim();
+  if (!peerId) {
+    try {
+      connection.close();
+    } catch (error) {
+      console.warn('Unnamed connection close failed:', error);
+    }
+    return;
+  }
+
+  const existing = connections.get(peerId);
+  if (existing && existing !== connection) {
+    try {
+      existing.close();
+    } catch (error) {
+      console.warn('Existing connection close failed:', error);
+    }
+  }
+
+  connections.set(peerId, connection);
+  updateConnectedLabel();
+
+  let finalized = false;
+  const finalize = () => {
+    if (finalized) return;
+    finalized = true;
+    if (connection.__shareviaClosing) {
+      connections.delete(peerId);
+      clearConnectionTimeout(peerId);
+      return;
+    }
+    handleConnectionClosed(peerId);
+  };
+
+  clearConnectionTimeout(peerId);
+  const timer = setTimeout(() => {
+    if (connection.__shareviaClosing) {
+      return;
+    }
     if (!connection.open) {
-      alert('Connection timed out. The host may have closed their browser or the room expired.');
-      try { connection.close(); } catch (e) {}
-      conn = null;
-      resetToSetup();
+      try {
+        connection.close();
+      } catch (error) {
+        console.warn('Timed out connection close failed:', error);
+      }
+      finalize();
+      if (!hostingMode) {
+        alert('Connection timed out. The host may have closed the room.');
+      }
     }
   }, CONNECTION_TIMEOUT);
+  connectionTimers.set(peerId, timer);
 
-  conn.on('open', () => {
-    clearTimeout(connectionTimer);
-    connectionTimer = null;
+  connection.on('open', () => {
+    connection.__shareviaClosing = false;
+    clearConnectionTimeout(peerId);
+    connections.set(peerId, connection);
     showSection(shareSection);
-    remotePeerIdEl.textContent = conn.peer;
+    updateConnectedLabel();
     updateStatus('Connected', 'connected');
+    const openCount = getOpenConnections().length;
+    console.info(`${sourceLabel} connection open with ${peerId}. Connected peers: ${openCount}`);
   });
 
-  conn.on('data', (data) => {
-    handleIncomingData(data);
+  connection.on('data', (data) => {
+    handleIncomingData(data, peerId);
   });
 
-  conn.on('close', () => {
-    clearTimeout(connectionTimer);
-    resetToSetup();
+  connection.on('close', () => {
+    clearConnectionTimeout(peerId);
+    finalize();
   });
 
-  conn.on('error', (err) => {
-    clearTimeout(connectionTimer);
+  connection.on('error', (err) => {
+    clearConnectionTimeout(peerId);
     console.error('Connection error:', err);
-    resetToSetup();
+    finalize();
   });
 }
 
 // --- Incoming Data Handler (compatible with web app protocol) ---
 
-function handleIncomingData(data) {
+function handleIncomingData(data, fromPeerId = '') {
   if (!data || typeof data !== 'object') return;
 
   switch (data.type) {
     case 'file-start':
-      handleIncomingFileStart(data);
+      handleIncomingFileStart(data, fromPeerId);
       break;
     case 'file-chunk':
-      handleIncomingFileChunk(data);
+      handleIncomingFileChunk(data, fromPeerId);
       break;
     case 'file-end':
-      handleIncomingFileEnd(data);
+      handleIncomingFileEnd(data, fromPeerId);
       break;
     case 'file-ack':
-      handleIncomingAck(data);
+      handleIncomingAck(data, fromPeerId);
       break;
     case 'file-cancel':
-      handleIncomingCancel(data);
+      handleIncomingCancel(data, fromPeerId);
       break;
     case 'text-note':
-      break;
     case 'capabilities':
-      break;
     default:
       break;
   }
 }
 
-function handleIncomingCancel(data) {
-  const id = data.transferId;
-  // CRITICAL: Set cancelled flag on the record object BEFORE deleting.
-  // The sendFile() loop holds a local reference and checks record.cancelled.
-  const outRecord = outgoingTransfers.get(id);
+function handleIncomingCancel(data, fromPeerId = '') {
+  const transferId = String(data.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
+
+  const outRecord = outgoingTransfers.get(transferKey);
   if (outRecord) {
     outRecord.cancelled = true;
   }
-  const inRecord = incomingTransfers.get(id);
+  const inRecord = incomingTransfers.get(transferKey);
   if (inRecord) {
     inRecord.cancelled = true;
   }
-  incomingTransfers.delete(id);
-  outgoingTransfers.delete(id);
-  markTransferCancelled(id);
+  incomingTransfers.delete(transferKey);
+  outgoingTransfers.delete(transferKey);
+  markTransferCancelled(transferKey);
 }
 
-function handleIncomingFileStart(data) {
+function handleIncomingFileStart(data, fromPeerId = '') {
+  const transferId = String(data.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
+  const peerLabel = normalizePeerLabel(fromPeerId);
+
   const record = {
-    transferId: data.transferId,
+    transferId,
+    peerId: fromPeerId,
     name: data.name,
     size: Number(data.size),
     mime: data.mime || 'application/octet-stream',
@@ -220,12 +415,15 @@ function handleIncomingFileStart(data) {
     chunks: new Array(Number(data.totalChunks)),
   };
 
-  incomingTransfers.set(data.transferId, record);
-  createTransferUI(data.transferId, data.name, data.size, 'incoming');
+  incomingTransfers.set(transferKey, record);
+  createTransferUI(transferKey, `${data.name} from ${peerLabel}`, data.size, 'incoming');
 }
 
-function handleIncomingFileChunk(data) {
-  const record = incomingTransfers.get(data.transferId);
+function handleIncomingFileChunk(data, fromPeerId = '') {
+  const transferId = String(data.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
+  const record = incomingTransfers.get(transferKey);
   if (!record || record.cancelled) return;
   if (record.chunks[data.index]) return;
 
@@ -234,23 +432,23 @@ function handleIncomingFileChunk(data) {
   record.receivedBytes += data.chunk.byteLength;
 
   const progress = (record.receivedBytes / record.size) * 100;
-  updateTransferProgress(data.transferId, progress, record.receivedBytes, record.size, record.startTs, 'Receiving');
+  updateTransferProgress(transferKey, progress, record.receivedBytes, record.size, record.startTs, 'Receiving');
 
-  // Send ACK every 32 chunks (matches web app)
   if (record.receivedChunks % 32 === 0 || record.receivedChunks === record.totalChunks) {
-    if (conn && conn.open) {
-      conn.send({
-        type: 'file-ack',
-        transferId: data.transferId,
-        receivedChunks: record.receivedChunks,
-        receivedBytes: record.receivedBytes,
-      });
-    }
+    sendToPeer(fromPeerId, {
+      type: 'file-ack',
+      transferId,
+      receivedChunks: record.receivedChunks,
+      receivedBytes: record.receivedBytes,
+    });
   }
 }
 
-function handleIncomingFileEnd(data) {
-  const record = incomingTransfers.get(data.transferId);
+function handleIncomingFileEnd(data, fromPeerId = '') {
+  const transferId = String(data.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
+  const record = incomingTransfers.get(transferKey);
   if (!record) return;
 
   if (record.receivedChunks !== record.totalChunks) {
@@ -270,48 +468,54 @@ function handleIncomingFileEnd(data) {
   const blob = new Blob(chunks, { type: record.mime });
   const url = URL.createObjectURL(blob);
 
-  updateTransferProgress(data.transferId, 100, record.size, record.size, record.startTs, 'Received');
-  markTransferComplete(data.transferId, `Received (${formatBytes(record.size)})`);
+  updateTransferProgress(transferKey, 100, record.size, record.size, record.startTs, 'Received');
+  markTransferComplete(transferKey, `Received (${formatBytes(record.size)})`);
+  addDownloadAction(transferKey, url, record.name);
 
-  // Add download button
-  addDownloadAction(data.transferId, url, record.name);
-
-  // Auto-download
   const a = document.createElement('a');
   a.href = url;
   a.download = record.name;
   a.click();
 
-  incomingTransfers.delete(data.transferId);
+  incomingTransfers.delete(transferKey);
 }
 
-function handleIncomingAck(data) {
-  const record = outgoingTransfers.get(data.transferId);
+function handleIncomingAck(data, fromPeerId = '') {
+  const transferId = String(data.transferId || '').trim();
+  if (!transferId) return;
+  const transferKey = makeTransferKey(fromPeerId, transferId);
+  const record = outgoingTransfers.get(transferKey);
   if (!record) return;
 
   record.ackedBytes = data.receivedBytes;
   const progress = (data.receivedBytes / record.size) * 100;
-  updateTransferProgress(data.transferId, progress, data.receivedBytes, record.size, record.startTs, 'Delivered');
+  updateTransferProgress(transferKey, progress, data.receivedBytes, record.size, record.startTs, 'Delivered');
 }
 
 // --- Send Files (compatible with web app protocol) ---
 
-async function waitForBufferSpace() {
-  const channel = conn && conn.dataChannel ? conn.dataChannel : null;
+async function waitForBufferSpace(connection) {
+  const channel = connection && connection.dataChannel ? connection.dataChannel : null;
   if (!channel) return;
   while (channel.bufferedAmount > CHANNEL_BUFFER_LIMIT) {
     await sleep(20);
   }
 }
 
-async function sendFile(file) {
-  if (!conn || !conn.open) return;
+async function sendFileToPeer(connection, file, options = {}) {
+  if (!connection || !connection.open) return;
 
+  const peerId = String(connection.peer || '').trim();
+  const peerLabel = normalizePeerLabel(peerId);
   const transferId = createTransferId();
+  const transferKey = makeTransferKey(peerId, transferId);
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const transferName = options.fanoutCount > 1 ? `${file.name} -> ${peerLabel}` : file.name;
 
   const record = {
-    id: transferId,
+    id: transferKey,
+    transferId,
+    peerId,
     size: file.size,
     sentBytes: 0,
     ackedBytes: 0,
@@ -319,10 +523,10 @@ async function sendFile(file) {
     totalChunks,
   };
 
-  outgoingTransfers.set(transferId, record);
-  createTransferUI(transferId, file.name, file.size, 'outgoing');
+  outgoingTransfers.set(transferKey, record);
+  createTransferUI(transferKey, transferName, file.size, 'outgoing');
 
-  conn.send({
+  const started = safeSendToConnection(connection, {
     type: 'file-start',
     transferId,
     name: file.name,
@@ -331,40 +535,58 @@ async function sendFile(file) {
     totalChunks,
   });
 
+  if (!started) {
+    record.cancelled = true;
+    markTransferCancelled(transferKey);
+    return;
+  }
+
   let offset = 0;
   for (let i = 0; i < totalChunks; i++) {
-    if (record.cancelled) {
-      markTransferCancelled(transferId);
+    if (record.cancelled || !connection.open) {
+      markTransferCancelled(transferKey);
       return;
     }
 
     const end = Math.min(offset + CHUNK_SIZE, file.size);
     const chunk = await file.slice(offset, end).arrayBuffer();
 
-    await waitForBufferSpace();
+    await waitForBufferSpace(connection);
 
-    if (record.cancelled) {
-      markTransferCancelled(transferId);
+    if (record.cancelled || !connection.open) {
+      markTransferCancelled(transferKey);
       return;
     }
 
-    conn.send({
+    const sent = safeSendToConnection(connection, {
       type: 'file-chunk',
       transferId,
       index: i,
       chunk,
     });
 
+    if (!sent) {
+      record.cancelled = true;
+      markTransferCancelled(transferKey);
+      return;
+    }
+
     offset = end;
     record.sentBytes = offset;
 
-    updateTransferProgress(transferId, (offset / file.size) * 100, offset, file.size, record.startTs, 'Sending');
+    updateTransferProgress(transferKey, (offset / file.size) * 100, offset, file.size, record.startTs, 'Sending');
 
     if (i % 32 === 0) await sleep(0);
   }
 
-  conn.send({ type: 'file-end', transferId });
-  markTransferComplete(transferId, `Sent (${formatBytes(file.size)})`);
+  safeSendToConnection(connection, { type: 'file-end', transferId });
+  markTransferComplete(transferKey, `Sent (${formatBytes(file.size)})`);
+}
+
+async function sendFile(file) {
+  const targets = getOpenConnections();
+  if (!targets.length) return;
+  await Promise.all(targets.map((connection) => sendFileToPeer(connection, file, { fanoutCount: targets.length })));
 }
 
 // --- UI Helpers ---
@@ -383,32 +605,61 @@ function showSection(section) {
   section.classList.add('active');
 }
 
-function resetToSetup() {
-  if (conn) { try { conn.close(); } catch (e) {} }
-  conn = null;
-  incomingTransfers.clear();
-  outgoingTransfers.clear();
-  transferList.innerHTML = '';
-  showSection(setupSection);
-  updateStatus('Disconnected', 'disconnected');
+function resetToSetup(options = {}) {
+  const destroyPeer = options.destroyPeer !== false;
+  if (isResetting) return;
+  isResetting = true;
+
+  try {
+    closeAllConnections();
+    incomingTransfers.clear();
+    outgoingTransfers.clear();
+    connectionTimers.clear();
+    pendingJoinId = null;
+    hostingMode = false;
+    updateConnectedLabel();
+    transferList.innerHTML = '';
+    if (destroyPeer && peer) {
+      try {
+        peer.destroy();
+      } catch (error) {
+        console.warn('Peer destroy failed:', error);
+      }
+      peer = null;
+      myId = null;
+    }
+    showSection(setupSection);
+    updateStatus('Disconnected', 'disconnected');
+  } finally {
+    setTimeout(() => {
+      isResetting = false;
+    }, 0);
+  }
 }
 
 function cancelTransfer(id, direction) {
+  let targetPeerId = '';
+  let rawTransferId = id;
+
   if (direction === 'outgoing') {
     const record = outgoingTransfers.get(id);
     if (record) {
       record.cancelled = true;
+      targetPeerId = record.peerId || '';
+      rawTransferId = record.transferId || id;
       outgoingTransfers.delete(id);
     }
   } else {
     const record = incomingTransfers.get(id);
     if (record) {
       record.cancelled = true;
+      targetPeerId = record.peerId || '';
+      rawTransferId = record.transferId || id;
     }
     incomingTransfers.delete(id);
   }
-  if (conn && conn.open) {
-    conn.send({ type: 'file-cancel', transferId: id });
+  if (targetPeerId) {
+    sendToPeer(targetPeerId, { type: 'file-cancel', transferId: rawTransferId });
   }
   markTransferCancelled(id);
 }
@@ -537,8 +788,11 @@ function addDownloadAction(id, url, fileName) {
 // --- Event Listeners ---
 
 document.getElementById('btn-host').addEventListener('click', () => {
+  hostingMode = true;
+  pendingJoinId = null;
   initPeer();
   showSection(hostingSection);
+  updateStatus('Creating', 'waiting');
 });
 
 document.getElementById('btn-join').addEventListener('click', () => {
@@ -550,11 +804,9 @@ document.getElementById('btn-join').addEventListener('click', () => {
     return;
   }
 
+  hostingMode = false;
+  pendingJoinId = id;
   initPeer();
-  peer.on('open', () => {
-    const connection = peer.connect(id, { reliable: true });
-    setupConnection(connection);
-  });
 });
 
 joinIdInput.addEventListener('keydown', (e) => {
@@ -575,13 +827,11 @@ document.getElementById('btn-copy-id').addEventListener('click', () => {
 });
 
 document.getElementById('btn-cancel-host').addEventListener('click', () => {
-  if (peer) peer.destroy();
-  resetToSetup();
+  resetToSetup({ destroyPeer: true });
 });
 
 document.getElementById('btn-disconnect').addEventListener('click', () => {
-  if (peer) peer.destroy();
-  resetToSetup();
+  resetToSetup({ destroyPeer: true });
 });
 
 // Drag and Drop
@@ -629,8 +879,8 @@ folderInput.addEventListener('change', () => {
 // --- File Handling ---
 
 async function handleFiles(files, items) {
-  if (!conn || !conn.open) {
-    alert('Connect to a peer first!');
+  if (!hasOpenConnections()) {
+    alert('Connect to at least one peer first!');
     return;
   }
 
@@ -668,3 +918,6 @@ async function getFilesFromEntry(entry, fileList) {
     }
   }
 }
+
+
+
