@@ -42,6 +42,16 @@ body {
   padding-top: var(--safe-top);
 }
 
+body.native-mode {
+  /* Ensure a minimum spacing for the Android status bar even if env() returns 0 */
+  padding-top: max(var(--safe-top), 28px);
+}
+
+body.native-mode .topbar {
+  /* Push the sticky header down accordingly */
+  top: calc(max(var(--safe-top), 28px) + 8px);
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

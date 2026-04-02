@@ -42,6 +42,16 @@ body {
   padding-top: var(--safe-top);
 }
 
+body.native-mode {
+  /* Ensure a minimum spacing for the Android status bar even if env() returns 0 */
+  padding-top: max(var(--safe-top), 28px);
+}
+
+body.native-mode .topbar {
+  /* Push the sticky header down accordingly */
+  top: calc(max(var(--safe-top), 28px) + 8px);
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -922,9 +932,11 @@ footer {
   0% {
     box-shadow: 0 0 0 0 rgba(11, 106, 97, 0.35);
   }
+
   70% {
     box-shadow: 0 0 0 14px rgba(11, 106, 97, 0);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(11, 106, 97, 0);
   }
@@ -935,6 +947,7 @@ footer {
     transform: translateY(8px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -946,10 +959,12 @@ footer {
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(13, 140, 87, 0.4);
   }
+
   70% {
     transform: scale(1.05);
     box-shadow: 0 0 0 14px rgba(13, 140, 87, 0);
   }
+
   100% {
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(13, 140, 87, 0);
@@ -1116,16 +1131,15 @@ footer {
     flex-wrap: wrap;
     gap: 4px;
   }
-  
+
   .transfer-name {
     flex: 1 1 100%;
     margin-bottom: 4px;
     font-size: 0.78rem;
   }
-  
+
   .transfer-head-right {
     width: 100%;
     justify-content: space-between;
   }
 }
-

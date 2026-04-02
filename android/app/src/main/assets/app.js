@@ -434,11 +434,12 @@ function detectCapabilities() {
   setCapabilityChip(elements.capLocation, 'Location', nativeMode, nativeMode ? 'native app available' : 'native app required');
   setCapabilityChip(elements.capNative, 'Native Bridge', nativeMode, nativeMode ? 'app mode' : 'web mode');
 
-  if (elements.capabilityNote) {
     elements.capabilityNote.textContent = nativeMode
       ? 'Native app mode detected. Pairing helpers and hardware permissions are enabled here.'
       : 'Browser mode detected. Use the Android app for Bluetooth/NFC pairing, background transfers, and OS-level permissions.';
   }
+
+  document.body.classList.toggle('native-mode', nativeMode);
 
   // Keep technical feature chips hidden in production UI.
   setElementHidden(elements.technicalCapabilities, true);
