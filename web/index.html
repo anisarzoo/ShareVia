@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>ShareVia - Fast Offline + Online File Transfer</title>
   <meta name="description" content="Share files directly between devices using QR, room code, and peer-to-peer transfer across Wi-Fi or internet.">
+  <meta name="sharevia-app-url" content="https://play.google.com/store/apps/details?id=com.ShareVia.app">
   <meta name="theme-color" content="#0d3f3a">
   <link rel="icon" type="image/png" href="icon128.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -35,10 +36,18 @@
 
     <main class="main-grid">
       <section id="setup-section" class="panel active">
-        <h2>Quick Share</h2>
-        <p class="subtitle">Tap Send or Receive to search nearby devices. If discovery fails, use QR/code or online link.</p>
+        <h2 id="setup-title">Quick Share</h2>
+        <p id="setup-subtitle" class="subtitle">Tap Send or Receive to search nearby devices. If discovery fails, use QR/code or online link.</p>
 
-        <div class="dashboard-grid">
+        <div id="web-app-banner" class="app-banner hidden">
+          <h3>Use Our Android App For Seamless Nearby Transfer</h3>
+          <p>
+            Nearby/offline-like device discovery works best in the ShareVia app with Bluetooth, Wi-Fi, and native permissions.
+          </p>
+          <a id="btn-get-app" class="btn btn-primary" href="https://play.google.com/store/apps/details?id=com.ShareVia.app" target="_blank" rel="noopener noreferrer">Get The App</a>
+        </div>
+
+        <div id="dashboard-grid" class="dashboard-grid">
           <button id="btn-dashboard-send" class="dashboard-card send" type="button">
             <span class="dashboard-title">Send</span>
             <span class="dashboard-copy">Create room and share files</span>
@@ -74,6 +83,16 @@
             <input type="text" id="join-id" placeholder="Enter 6-digit room code" inputmode="numeric" maxlength="6">
             <button id="btn-join" class="btn btn-secondary">Join</button>
           </div>
+        </div>
+
+        <div id="web-join-panel" class="web-join-panel hidden">
+          <h3>Join Online Transfer</h3>
+          <p class="subtitle">For distant transfer, open room link or enter code below.</p>
+          <div class="join-inline">
+            <input type="text" id="web-join-id" placeholder="Enter 6-digit room code" inputmode="numeric" maxlength="6">
+            <button id="btn-web-join" class="btn btn-secondary" type="button">Join</button>
+          </div>
+          <button id="btn-web-scan" class="btn btn-dark" type="button">Scan QR</button>
         </div>
 
         <button id="btn-advanced" class="link-btn" type="button" aria-haspopup="true" aria-expanded="false">Network and Transfer Settings</button>

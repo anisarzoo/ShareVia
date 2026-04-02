@@ -20,6 +20,7 @@ const RECONNECT_DELAY = 2000;
 const MAX_HISTORY_ENTRIES = 300;
 const MAX_RECEIVED_ARCHIVE_ITEMS = 300;
 const JSZIP_CDN_URL = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+const DEFAULT_APP_DOWNLOAD_URL = 'https://play.google.com/store/apps/details?id=com.ShareVia.app';
 
 const state = {
   peer: null,
@@ -44,12 +45,23 @@ const state = {
   transferHistory: loadTransferHistory(),
   historyFilter: 'all',
   receivedArchiveItems: [],
+  webJoinOnly: false,
+  appDownloadUrl: DEFAULT_APP_DOWNLOAD_URL,
 };
 
 const elements = {
   setupSection: document.getElementById('setup-section'),
+  setupTitle: document.getElementById('setup-title'),
+  setupSubtitle: document.getElementById('setup-subtitle'),
   hostingSection: document.getElementById('hosting-section'),
   shareSection: document.getElementById('share-section'),
+  dashboardGrid: document.getElementById('dashboard-grid'),
+  webAppBanner: document.getElementById('web-app-banner'),
+  btnGetApp: document.getElementById('btn-get-app'),
+  webJoinPanel: document.getElementById('web-join-panel'),
+  webJoinIdInput: document.getElementById('web-join-id'),
+  btnWebJoin: document.getElementById('btn-web-join'),
+  btnWebScan: document.getElementById('btn-web-scan'),
   btnDashboardSend: document.getElementById('btn-dashboard-send'),
   btnDashboardReceive: document.getElementById('btn-dashboard-receive'),
   radarPanel: document.getElementById('radar-panel'),
@@ -98,6 +110,7 @@ const elements = {
   btnNativeBluetooth: document.getElementById('btn-native-bluetooth'),
   btnNativeNfc: document.getElementById('btn-native-nfc'),
   btnNativeLocation: document.getElementById('btn-native-location'),
+  btnAdvanced: document.getElementById('btn-advanced'),
   formSettings: document.getElementById('form-settings'),
   capWebrtc: document.getElementById('cap-webrtc'),
   capWifi: document.getElementById('cap-wifi'),
@@ -340,6 +353,11 @@ function buildIceConfig() {
 }
 
 function updateTransportBadge() {
+  if (state.webJoinOnly) {
+    elements.transportBadge.textContent = 'Web Join Mode';
+    return;
+  }
+
   const isCustomHost = Boolean(state.config.signalingHost);
   if (hasNativeBridge()) {
     elements.transportBadge.textContent = isCustomHost ? 'LAN + Online Ready' : 'Local + Online Ready';
@@ -434,6 +452,74 @@ function setCapabilityChip(element, label, supported, detail) {
 function setElementHidden(element, hidden) {
   if (!element) return;
   element.classList.toggle('hidden', hidden);
+}
+
+function resolveAppDownloadUrl() {
+  const meta = document.querySelector('meta[name="sharevia-app-url"]');
+  const candidate = String((meta && meta.content) || '').trim();
+  if (/^https?:\/\//i.test(candidate)) {
+    return candidate;
+  }
+  return DEFAULT_APP_DOWNLOAD_URL;
+}
+
+function configurePlatformMode() {
+  const nativeMode = hasNativeBridge();
+  state.webJoinOnly = !nativeMode;
+  state.appDownloadUrl = resolveAppDownloadUrl();
+
+  document.body.classList.toggle('native-mode', nativeMode);
+  document.body.classList.toggle('web-join-mode', state.webJoinOnly);
+
+  if (elements.btnGetApp) {
+    elements.btnGetApp.href = state.appDownloadUrl;
+  }
+
+  setElementHidden(elements.webAppBanner, !state.webJoinOnly);
+  setElementHidden(elements.webJoinPanel, !state.webJoinOnly);
+  setElementHidden(elements.dashboardGrid, state.webJoinOnly);
+  setElementHidden(elements.btnAdvanced, state.webJoinOnly);
+  if (state.webJoinOnly) {
+    setElementHidden(elements.advancedPanel, true);
+    setElementHidden(elements.radarPanel, true);
+    setElementHidden(elements.technicalCapabilities, true);
+    state.dashboardMode = 'idle';
+  }
+
+  if (elements.setupTitle) {
+    elements.setupTitle.textContent = state.webJoinOnly ? 'Join Transfer' : 'Quick Share';
+  }
+  if (elements.setupSubtitle) {
+    elements.setupSubtitle.textContent = state.webJoinOnly
+      ? 'Use ShareVia app for seamless nearby transfer. Join distant realtime sessions here.'
+      : 'Tap Send or Receive to search nearby devices. If discovery fails, use QR/code or online link.';
+  }
+}
+
+async function disableBrowserOfflineCache() {
+  if (!state.webJoinOnly || !('serviceWorker' in navigator)) {
+    return;
+  }
+
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((reg) => reg.unregister()));
+  } catch (error) {
+    console.warn('Service worker unregister failed:', error);
+  }
+
+  if ('caches' in window) {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key.startsWith('sharevia-'))
+          .map((key) => caches.delete(key)),
+      );
+    } catch (error) {
+      console.warn('Cache cleanup failed:', error);
+    }
+  }
 }
 
 function applyNativeSafeTopInset() {
@@ -1018,8 +1104,8 @@ function handlePeerError(error) {
   console.error('Peer error:', error);
 
   if (error && error.type === 'peer-unavailable') {
-    alert('Room was not found. Please check the room code or QR.');
-    logActivity('Room not found.', 'Warning');
+    alert('Room was not found or is offline. Ask sender to keep ShareVia open and share a new code/link.');
+    logActivity('Room unavailable or offline.', 'Warning');
   } else {
     const type = error && error.type ? error.type : 'unknown';
     alert(`Connection error: ${type}`);
@@ -1075,6 +1161,15 @@ function hostRoom() {
 }
 
 function beginSendDiscovery() {
+  if (state.webJoinOnly) {
+    if (elements.btnGetApp && elements.btnGetApp.href) {
+      window.open(elements.btnGetApp.href, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    alert('Install the ShareVia app for nearby send mode.');
+    return;
+  }
+
   if (state.conn && state.conn.open) {
     alert('Already connected. Disconnect current session first.');
     return;
@@ -1097,6 +1192,13 @@ function beginSendDiscovery() {
 }
 
 function beginReceiveDiscovery() {
+  if (state.webJoinOnly) {
+    setElementHidden(elements.webJoinPanel, false);
+    showSection(elements.setupSection);
+    updateStatus('Join Online', 'waiting');
+    return;
+  }
+
   if (state.conn && state.conn.open) {
     alert('Already connected. Disconnect current session first.');
     return;
@@ -1183,7 +1285,7 @@ function setupConnection(connection, sourceLabel) {
 
   connection.on('close', () => {
     clearTimeout(state.connectionTimer);
-    logActivity('Peer disconnected.');
+    logActivity('Peer disconnected. Realtime transfer requires sender to stay online.', 'Warning');
     invokeNativeAction('stopTransferService', {}, { silentIfUnavailable: true });
     resetToSetup({ destroyPeer: true });
   });
@@ -1223,6 +1325,9 @@ function resetToSetup(options = {}) {
     setElementHidden(elements.radarPanel, true);
     updateRadarModeUI();
     setRadarStatus('Tap Receive to start nearby scan.');
+    if (state.webJoinOnly) {
+      setElementHidden(elements.webJoinPanel, false);
+    }
 
     invokeNativeAction('stopTransferService', {}, { silentIfUnavailable: true });
     invokeNativeAction('stopPairing', {}, { silentIfUnavailable: true });
@@ -1257,7 +1362,7 @@ function resetToSetup(options = {}) {
     elements.remotePeerId.textContent = '------';
 
     showSection(elements.setupSection);
-    updateStatus('Disconnected', 'disconnected');
+    updateStatus(state.webJoinOnly ? 'Join Online' : 'Disconnected', state.webJoinOnly ? 'waiting' : 'disconnected');
     window.location.hash = '';
   } finally {
     setTimeout(() => {
@@ -1874,7 +1979,11 @@ function handleScanResult(decodedText) {
   }
 
   stopScanner();
-  elements.joinIdInput.value = roomId;
+  if (state.webJoinOnly && elements.webJoinIdInput) {
+    elements.webJoinIdInput.value = roomId;
+  } else {
+    elements.joinIdInput.value = roomId;
+  }
   joinRoom(roomId);
 }
 
@@ -1892,20 +2001,20 @@ function saveAdvancedConfig() {
 }
 
 function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) {
+  if (!state.webJoinOnly) {
     return;
   }
 
-  navigator.serviceWorker.register('./sw.js').then(() => {
-    logActivity('Offline cache enabled.');
-  }).catch((error) => {
-    console.warn('Service worker registration failed:', error);
+  disableBrowserOfflineCache().then(() => {
+    logActivity('Web offline cache disabled. Install the app for seamless nearby transfer.');
   });
 }
 
 function bindEvents() {
   elements.btnDashboardSend && elements.btnDashboardSend.addEventListener('click', beginSendDiscovery);
   elements.btnDashboardReceive && elements.btnDashboardReceive.addEventListener('click', beginReceiveDiscovery);
+  elements.btnWebJoin && elements.btnWebJoin.addEventListener('click', () => joinRoom(elements.webJoinIdInput.value));
+  elements.btnWebScan && elements.btnWebScan.addEventListener('click', startScanner);
 
   elements.btnScan && elements.btnScan.addEventListener('click', startScanner);
   document.getElementById('btn-close-scanner').addEventListener('click', stopScanner);
@@ -1946,6 +2055,13 @@ function bindEvents() {
     if (event.key === 'Enter') {
       event.preventDefault();
       joinRoom(elements.joinIdInput.value);
+    }
+  });
+
+  elements.webJoinIdInput && elements.webJoinIdInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      joinRoom(elements.webJoinIdInput.value);
     }
   });
 
@@ -2004,20 +2120,22 @@ function initialize() {
   }
   initializeDone = true;
 
-  document.body.classList.toggle('native-mode', hasNativeBridge());
+  configurePlatformMode();
 
   applyConfigToUI();
   updateTransportBadge();
-  updateStatus('Disconnected', 'disconnected');
+  updateStatus(state.webJoinOnly ? 'Join Online' : 'Disconnected', state.webJoinOnly ? 'waiting' : 'disconnected');
   setElementHidden(elements.radarPanel, true);
   updateRadarModeUI();
-  setRadarStatus('Tap Receive to start nearby scan.');
+  setRadarStatus(state.webJoinOnly ? 'Join via room link or 6-digit code.' : 'Tap Receive to start nearby scan.');
   bindEvents();
-  try {
-    detectCapabilities();
-  } catch (error) {
-    console.error('Capability detection failed:', error);
-    logActivity('Capability detection failed. Basic mode is active.', 'Warning');
+  if (!state.webJoinOnly) {
+    try {
+      detectCapabilities();
+    } catch (error) {
+      console.error('Capability detection failed:', error);
+      logActivity('Capability detection failed. Basic mode is active.', 'Warning');
+    }
   }
   setHistoryFilter('all');
   updateSaveAllButtonState();
@@ -2044,7 +2162,11 @@ function initialize() {
 
   const roomIdFromUrl = extractRoomId(window.location.href);
   if (roomIdFromUrl) {
-    elements.joinIdInput.value = roomIdFromUrl;
+    if (state.webJoinOnly && elements.webJoinIdInput) {
+      elements.webJoinIdInput.value = roomIdFromUrl;
+    } else {
+      elements.joinIdInput.value = roomIdFromUrl;
+    }
     joinRoom(roomIdFromUrl);
   }
 }
