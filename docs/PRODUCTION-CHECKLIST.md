@@ -1,4 +1,4 @@
-﻿# Production Checklist
+# Production Checklist
 
 ## Security
 - Use HTTPS for web and signaling in public networks.

@@ -1,4 +1,4 @@
-﻿Place the web client bundle in this directory for native offline startup:
+Place the web client bundle in this directory for native offline startup:
 
 Required files:
 - index.html

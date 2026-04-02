@@ -1,4 +1,4 @@
-package com.p2pshare.app
+package com.ShareVia.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -52,7 +52,7 @@ class TransferForegroundService : Service() {
 
     private fun buildNotification(statusText: String) =
         NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("ConnectVia transfer running")
+            .setContentTitle("ShareVia transfer running")
             .setContentText(statusText)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setOngoing(true)
@@ -84,16 +84,16 @@ class TransferForegroundService : Service() {
     }
 
     companion object {
-        private const val CHANNEL_ID = "connectvia_transfer"
-        private const val CHANNEL_NAME = "ConnectVia Transfers"
+        private const val CHANNEL_ID = "sharevia_transfer"
+        private const val CHANNEL_NAME = "ShareVia Transfers"
         private const val CHANNEL_DESCRIPTION = "Keeps transfer sessions alive in background mode."
         private const val NOTIFICATION_ID = 3004
         private const val EXTRA_STATUS_TEXT = "extra_status_text"
         private const val DEFAULT_STATUS = "Connected and ready to transfer files."
 
-        private const val ACTION_START = "com.p2pshare.app.action.START_TRANSFER_SERVICE"
-        private const val ACTION_STOP = "com.p2pshare.app.action.STOP_TRANSFER_SERVICE"
-        private const val ACTION_UPDATE = "com.p2pshare.app.action.UPDATE_TRANSFER_SERVICE"
+        private const val ACTION_START = "com.ShareVia.app.action.START_TRANSFER_SERVICE"
+        private const val ACTION_STOP = "com.ShareVia.app.action.STOP_TRANSFER_SERVICE"
+        private const val ACTION_UPDATE = "com.ShareVia.app.action.UPDATE_TRANSFER_SERVICE"
 
         fun start(context: Context, statusText: String = DEFAULT_STATUS) {
             dispatch(context, ACTION_START, statusText)

@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 )
 
@@ -17,8 +17,8 @@ $files = @(
 
 $targets = @(
     (Join-Path $Root "android\app\src\main\assets")
-    (Join-Path $Root "ios\P2PShare\WebAssets")
-    (Join-Path $Root "windows\P2PShare.Windows\Assets\Web")
+    (Join-Path $Root "ios\ShareVia\WebAssets")
+    (Join-Path $Root "windows\ShareVia.Windows\Assets\Web")
 )
 
 if (!(Test-Path $sourceDir)) {

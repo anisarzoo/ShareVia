@@ -1,6 +1,6 @@
 {
-  "name": "ConnectVia",
-  "short_name": "ConnectVia",
+  "name": "ShareVia",
+  "short_name": "ShareVia",
   "description": "Offline and online peer-to-peer file sharing with QR and room codes.",
   "start_url": "./index.html",
   "display": "standalone",

@@ -1,4 +1,4 @@
-package com.p2pshare.app
+package com.ShareVia.app
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -164,7 +164,7 @@ class NearbyRoomDiscoveryManager(
         }
 
     companion object {
-        private const val SERVICE_ID = "com.p2pshare.app.nearby.room"
+        private const val SERVICE_ID = "com.ShareVia.app.nearby.room"
         private const val ENDPOINT_PREFIX = "CV-"
     }
 }

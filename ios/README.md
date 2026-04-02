@@ -1,15 +1,15 @@
-﻿# iOS App (Production Starter)
+# iOS App (Production Starter)
 
-This folder provides a SwiftUI + WKWebView native wrapper around the shared P2PShare web client.
+This folder provides a SwiftUI + WKWebView native wrapper around the shared ShareVia web client.
 
 ## Included
-- `P2PShareApp.swift`: app entry point.
+- `ShareViaApp.swift`: app entry point.
 - `WebContainerView.swift`: WKWebView host with JS bridge injection.
 - `Bridge/NativeBridgeCoordinator.swift`: handles native pairing callbacks.
 - `Info.plist`: camera, bluetooth, NFC, and location usage descriptions.
 
 ## Build notes
-1. Create an Xcode iOS app project and add files from `ios/P2PShare/`.
+1. Create an Xcode iOS app project and add files from `ios/ShareVia/`.
 2. Add the web bundle into app resources.
 3. Ensure `NativeP2PBridge` script message handler is enabled.
 

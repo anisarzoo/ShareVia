@@ -1,4 +1,4 @@
-﻿Copy the latest web bundle from ../web into this directory for offline startup.
+Copy the latest web bundle from ../web into this directory for offline startup.
 
 Recommended files:
 - index.html

@@ -1,4 +1,4 @@
-package com.p2pshare.app
+package com.ShareVia.app
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager

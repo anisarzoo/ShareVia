@@ -1,4 +1,4 @@
-﻿namespace P2PShare.Windows.Services;
+namespace ShareVia.Windows.Services;
 
 public sealed class NativeBridgeService
 {

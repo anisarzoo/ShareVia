@@ -1,18 +1,18 @@
-﻿# Windows App (Production Starter)
+# Windows App (Production Starter)
 
-This folder contains a WPF + WebView2 desktop app wrapper for P2PShare.
+This folder contains a WPF + WebView2 desktop app wrapper for ShareVia.
 
 ## Included
-- `P2PShare.Windows.csproj` (.NET 8)
+- `ShareVia.Windows.csproj` (.NET 8)
 - `MainWindow.xaml` + `MainWindow.xaml.cs`
 - `Services/NativeBridgeService.cs`
 - `Assets/Web/` for the web bundle
 
 ## Build
-1. Copy files from `../web` into `P2PShare.Windows/Assets/Web/`.
+1. Copy files from `../web` into `ShareVia.Windows/Assets/Web/`.
 2. Run:
-   - `dotnet restore windows/P2PShare.Windows/P2PShare.Windows.csproj`
-   - `dotnet build windows/P2PShare.Windows/P2PShare.Windows.csproj -c Release`
+   - `dotnet restore windows/ShareVia.Windows/ShareVia.Windows.csproj`
+   - `dotnet build windows/ShareVia.Windows/ShareVia.Windows.csproj -c Release`
 
 ## Native bridge actions
 - `startBluetoothPairing`

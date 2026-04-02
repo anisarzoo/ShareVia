@@ -1,6 +1,6 @@
-﻿# Android App (Production Starter)
+# Android App (Production Starter)
 
-This folder contains a native Android WebView wrapper for the upgraded ConnectVia web client.
+This folder contains a native Android WebView wrapper for the upgraded ShareVia web client.
 
 ## Why this structure
 - Native permissions for Bluetooth, NFC, camera, and location.

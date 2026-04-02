@@ -1,4 +1,4 @@
-﻿import Foundation
+import Foundation
 import WebKit
 
 final class NativeBridgeCoordinator: NSObject, WKScriptMessageHandler {

@@ -1,4 +1,4 @@
-package com.p2pshare.app
+package com.ShareVia.app
 
 import android.app.Activity
 import android.nfc.NfcAdapter

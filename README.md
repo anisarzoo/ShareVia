@@ -1,4 +1,4 @@
-# ConnectVia
+# ShareVia
 
 Cross-platform P2P file sharing baseline:
 - Offline on local Wi-Fi (via local signaling server)

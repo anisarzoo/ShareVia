@@ -19,7 +19,7 @@ const btnPickFiles = document.getElementById('btn-pick-files');
 const btnPickFolder = document.getElementById('btn-pick-folder');
 
 // Web app URL for QR codes
-const WEB_APP_URL = "https://connectvia.netlify.app";
+const WEB_APP_URL = "https://sharevia.netlify.app";
 
 // Transfer config — matches web app
 const CHUNK_SIZE = 65536; // 64KB

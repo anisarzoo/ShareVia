@@ -1,14 +1,14 @@
-﻿plugins {
+plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
 android {
-    namespace = "com.p2pshare.app"
+    namespace = "com.ShareVia.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.p2pshare.app"
+        applicationId = "com.ShareVia.app"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

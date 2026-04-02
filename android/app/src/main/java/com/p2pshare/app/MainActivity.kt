@@ -1,4 +1,4 @@
-package com.p2pshare.app
+package com.ShareVia.app
 
 import android.Manifest
 import android.annotation.SuppressLint

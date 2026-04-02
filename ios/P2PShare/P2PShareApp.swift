@@ -1,7 +1,7 @@
-﻿import SwiftUI
+import SwiftUI
 
 @main
-struct P2PShareApp: App {
+struct ShareViaApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

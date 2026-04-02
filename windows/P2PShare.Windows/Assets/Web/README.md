@@ -1,4 +1,4 @@
-﻿Copy the latest web bundle from ../../web into this folder.
+Copy the latest web bundle from ../../web into this folder.
 
 Required files:
 - index.html

@@ -73,7 +73,7 @@ app.use((req, res, next) => {
 app.get('/health', (_req, res) => {
   res.json({
     ok: true,
-    service: 'connectvia-signal-server',
+    service: 'sharevia-signal-server',
     peerPath: PEER_PATH,
     protocol: ENABLE_HTTPS ? 'https' : 'http',
     corsMode: corsPolicy.wildcard ? 'wildcard' : 'allowlist',
@@ -104,7 +104,7 @@ peerServer.on('disconnect', (client) => {
 app.use(PEER_PATH, peerServer);
 
 server.listen(PORT, HOST, () => {
-  console.log(`ConnectVia signaling server listening on ${protocol}://${HOST}:${PORT}${PEER_PATH}`);
+  console.log(`ShareVia signaling server listening on ${protocol}://${HOST}:${PORT}${PEER_PATH}`);
 });
 
 for (const signal of ['SIGTERM', 'SIGINT']) {

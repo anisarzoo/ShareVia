@@ -1,4 +1,4 @@
-const CACHE_NAME = 'connectvia-v4';
+const CACHE_NAME = 'ShareVia-v4';
 const CORE_ASSETS = [
   './',
   './index.html',

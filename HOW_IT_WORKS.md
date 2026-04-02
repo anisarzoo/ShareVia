@@ -1,12 +1,12 @@
-# How ConnectVia Works 🚀
+# How ShareVia Works 🚀
 
-ConnectVia is a high-performance, cross-platform P2P file sharing system. It allows two devices to transfer files and folders directly without ever going through a server's hard drive.
+ShareVia is a high-performance, cross-platform P2P file sharing system. It allows two devices to transfer files and folders directly without ever going through a server's hard drive.
 
 ---
 
 ## 🏗️ 1. Architecture
 
-ConnectVia uses a "Source of Truth" model where the **Web Client** is the core logic engine.
+ShareVia uses a "Source of Truth" model where the **Web Client** is the core logic engine.
 
 - **Web Client (`web/`)**: Built with Vanilla JS and WebRTC. Standardized for all platforms.
 - **Browser Extension (`extension/`)**: A dedicated wrapper for Chrome/Edge with a matching design system.
@@ -36,7 +36,7 @@ Once the "Connected" badge appears, the Signaling Server is no longer involved. 
 
 ## 📁 3. The Transfer Protocol
 
-ConnectVia uses a custom, reliable chunking protocol built on top of WebRTC:
+ShareVia uses a custom, reliable chunking protocol built on top of WebRTC:
 
 1. **`file-start`**: Metadata is sent (name, size, total chunks).
 2. **Chunking**: Files are split into **64KB batches**. This ensures memory stability even for 10GB+ files.
@@ -59,4 +59,4 @@ ConnectVia uses a custom, reliable chunking protocol built on top of WebRTC:
 
 - **Desktop (Web/Win)**: Drag-and-drop support and native speeds.
 - **Mobile (iOS/Android)**: Optimized touch interface and camera-based QR scanning.
-- **Offline / LAN**: In places with no internet, you can run the `signal-server` locally on your Wi-Fi, and ConnectVia will work perfectly over your router (AirDrop style).
+- **Offline / LAN**: In places with no internet, you can run the `signal-server` locally on your Wi-Fi, and ShareVia will work perfectly over your router (AirDrop style).

@@ -2,9 +2,9 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
-using P2PShare.Windows.Services;
+using ShareVia.Windows.Services;
 
-namespace P2PShare.Windows;
+namespace ShareVia.Windows;
 
 public partial class MainWindow : Window
 {
@@ -38,7 +38,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            Browser.Source = new Uri("https://connectvia.netlify.app");
+            Browser.Source = new Uri("https://sharevia.netlify.app");
         }
     }
 

@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: connectvia-signal
+    name: sharevia-signal
     env: node
     plan: free
     rootDir: signal-server

@@ -1,3 +1,3 @@
-﻿-keepclassmembers class com.p2pshare.app.NativeBridge {
+-keepclassmembers class com.ShareVia.app.NativeBridge {
     public *;
 }

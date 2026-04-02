@@ -1,4 +1,4 @@
-# ConnectVia Signaling Server
+# ShareVia Signaling Server
 
 Use this service for:
 - Online room signaling with stable uptime.

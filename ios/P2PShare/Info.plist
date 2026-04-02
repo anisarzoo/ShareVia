@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>ConnectVia</string>
+    <string>ShareVia</string>
     <key>CFBundleName</key>
-    <string>ConnectVia</string>
+    <string>ShareVia</string>
     <key>NSCameraUsageDescription</key>
     <string>Camera access is used to scan pairing QR codes.</string>
     <key>NSBluetoothAlwaysUsageDescription</key>

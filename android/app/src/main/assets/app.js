@@ -11,7 +11,7 @@ const DEFAULT_CONFIG = {
   ackEvery: 32,
 };
 
-const STORAGE_KEY = 'connectvia_config_v2';
+const STORAGE_KEY = 'sharevia_config_v1';
 const CHANNEL_BUFFER_LIMIT = 2 * 1024 * 1024;
 const CONNECTION_TIMEOUT = 15000;
 const RECONNECT_MAX_ATTEMPTS = 3;

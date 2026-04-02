@@ -1,6 +1,6 @@
-﻿using System.Windows;
+using System.Windows;
 
-namespace P2PShare.Windows;
+namespace ShareVia.Windows;
 
 public partial class App : Application
 {
