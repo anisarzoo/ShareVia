@@ -68,6 +68,7 @@ const elements = {
   capabilityNote: document.getElementById('capability-note'),
   capabilityGrid: document.getElementById('capability-grid'),
   nativeActions: document.getElementById('native-actions'),
+  formSettings: document.getElementById('form-settings'),
   capWebrtc: document.getElementById('cap-webrtc'),
   capWifi: document.getElementById('cap-wifi'),
   capBluetooth: document.getElementById('cap-bluetooth'),
@@ -1215,7 +1216,9 @@ function handleScanResult(decodedText) {
 }
 
 function toggleAdvancedPanel() {
-  elements.advancedPanel.classList.toggle('hidden');
+  const isHidden = elements.advancedPanel.classList.toggle('hidden');
+  const btn = document.getElementById('btn-advanced');
+  btn.setAttribute('aria-expanded', !isHidden);
 }
 
 function saveAdvancedConfig() {
@@ -1245,7 +1248,10 @@ function bindEvents() {
   document.getElementById('btn-join').addEventListener('click', () => joinRoom(elements.joinIdInput.value));
   document.getElementById('btn-disconnect').addEventListener('click', () => resetToSetup({ destroyPeer: true }));
   document.getElementById('btn-advanced').addEventListener('click', toggleAdvancedPanel);
-  document.getElementById('btn-save-config').addEventListener('click', saveAdvancedConfig);
+  elements.formSettings.addEventListener('submit', (event) => {
+    event.preventDefault();
+    saveAdvancedConfig();
+  });
   document.getElementById('btn-send-note').addEventListener('click', queueNote);
 
   document.getElementById('btn-native-wifi').addEventListener('click', () => invokeNativeAction('startWifiPairing'));

@@ -1,0 +1,22 @@
+# Web
+node_modules/
+.DS_Store
+
+# Android
+.gradle/
+build/
+*.iml
+local.properties
+.idea/
+
+# Windows
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# iOS
+DerivedData/
+*.moved-aside
+*.xcuserstate

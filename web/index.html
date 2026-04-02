@@ -48,60 +48,62 @@
           <button id="btn-join" class="btn btn-secondary">Join</button>
         </div>
 
-        <button id="btn-advanced" class="link-btn" type="button">Network and Transfer Settings</button>
+        <button id="btn-advanced" class="link-btn" type="button" aria-haspopup="true" aria-expanded="false">Network and Transfer Settings</button>
         <div id="advanced-panel" class="advanced hidden">
-          <div class="field-grid">
-            <label class="field">
-              <span>Signaling Host (blank = default cloud)</span>
-              <input id="signal-host" type="text" placeholder="192.168.1.20">
-            </label>
-            <label class="field">
-              <span>Port</span>
-              <input id="signal-port" type="number" min="1" max="65535" placeholder="9000">
-            </label>
-            <label class="field">
-              <span>Path</span>
-              <input id="signal-path" type="text" value="/peerjs">
-            </label>
-            <label class="field field-span-2">
-              <span>STUN URL</span>
-              <input id="ice-stun-url" type="text" value="stun:stun.l.google.com:19302">
-            </label>
-            <label class="field field-span-2">
-              <span>TURN URLs (comma separated)</span>
-              <input id="ice-turn-urls" type="text" placeholder="turn:turn.example.com:3478?transport=udp,turns:turn.example.com:5349">
-            </label>
-            <label class="field">
-              <span>TURN Username</span>
-              <input id="ice-turn-username" type="text" placeholder="turn-user">
-            </label>
-            <label class="field">
-              <span>TURN Credential</span>
-              <input id="ice-turn-credential" type="password" placeholder="turn-password">
-            </label>
-            <label class="field">
-              <span>Chunk Size</span>
-              <select id="chunk-size">
-                <option value="32768">32 KB</option>
-                <option value="65536" selected>64 KB</option>
-                <option value="131072">128 KB</option>
-                <option value="262144">256 KB</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Ack Interval</span>
-              <select id="ack-every">
-                <option value="16">Every 16 chunks</option>
-                <option value="32" selected>Every 32 chunks</option>
-                <option value="64">Every 64 chunks</option>
-              </select>
-            </label>
-            <label class="check">
-              <input id="signal-secure" type="checkbox" checked>
-              <span>Use secure TLS connection</span>
-            </label>
-          </div>
-          <button id="btn-save-config" class="btn btn-secondary full">Save Settings</button>
+          <form id="form-settings">
+            <div class="field-grid">
+              <label class="field">
+                <span>Signaling Host (blank = default cloud)</span>
+                <input id="signal-host" type="text" placeholder="192.168.1.20">
+              </label>
+              <label class="field">
+                <span>Port</span>
+                <input id="signal-port" type="number" min="1" max="65535" placeholder="9000">
+              </label>
+              <label class="field">
+                <span>Path</span>
+                <input id="signal-path" type="text" value="/peerjs">
+              </label>
+              <label class="field field-span-2">
+                <span>STUN URL</span>
+                <input id="ice-stun-url" type="text" value="stun:stun.l.google.com:19302">
+              </label>
+              <label class="field field-span-2">
+                <span>TURN URLs (comma separated)</span>
+                <input id="ice-turn-urls" type="text" placeholder="turn:turn.example.com:3478?transport=udp,turns:turn.example.com:5349">
+              </label>
+              <label class="field">
+                <span>TURN Username</span>
+                <input id="ice-turn-username" type="text" placeholder="turn-user">
+              </label>
+              <label class="field">
+                <span>TURN Credential</span>
+                <input id="ice-turn-credential" type="password" placeholder="turn-password">
+              </label>
+              <label class="field">
+                <span>Chunk Size</span>
+                <select id="chunk-size">
+                  <option value="32768">32 KB</option>
+                  <option value="65536" selected>64 KB</option>
+                  <option value="131072">128 KB</option>
+                  <option value="262144">256 KB</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Ack Interval</span>
+                <select id="ack-every">
+                  <option value="16">Every 16 chunks</option>
+                  <option value="32" selected>Every 32 chunks</option>
+                  <option value="64">Every 64 chunks</option>
+                </select>
+              </label>
+              <label class="check">
+                <input id="signal-secure" type="checkbox" checked>
+                <span>Use secure TLS connection</span>
+              </label>
+            </div>
+            <button id="btn-save-config" type="submit" class="btn btn-secondary full">Save Settings</button>
+          </form>
         </div>
 
         <div class="capabilities">
