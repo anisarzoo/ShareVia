@@ -56,6 +56,10 @@ const elements = {
   radarPulse: document.getElementById('radar-pulse'),
   radarStatus: document.getElementById('radar-status'),
   nearbyDeviceList: document.getElementById('nearby-device-list'),
+  btnShowMyCode: document.getElementById('btn-show-my-code'),
+  btnShareOnlineLink: document.getElementById('btn-share-online-link'),
+  btnScan: document.getElementById('btn-scan'),
+  joinInline: document.getElementById('join-inline'),
   statusBadge: document.getElementById('status-badge'),
   transportBadge: document.getElementById('transport-badge'),
   myPeerId: document.getElementById('my-peer-id'),
@@ -337,6 +341,11 @@ function buildIceConfig() {
 
 function updateTransportBadge() {
   const isCustomHost = Boolean(state.config.signalingHost);
+  if (hasNativeBridge()) {
+    elements.transportBadge.textContent = isCustomHost ? 'LAN + Online Ready' : 'Local + Online Ready';
+    return;
+  }
+
   elements.transportBadge.textContent = isCustomHost ? 'LAN Signaling' : 'Cloud Signaling';
 }
 
@@ -585,6 +594,14 @@ function clearNearbyDevices() {
   renderNearbyDevices();
 }
 
+function updateRadarModeUI() {
+  const sendMode = state.dashboardMode === 'send';
+  setElementHidden(elements.btnShowMyCode, !sendMode);
+  setElementHidden(elements.btnShareOnlineLink, !sendMode);
+  setElementHidden(elements.joinInline, sendMode);
+  setElementHidden(elements.btnScan, sendMode);
+}
+
 function renderNearbyDevices() {
   if (!elements.nearbyDeviceList) return;
 
@@ -598,7 +615,9 @@ function renderNearbyDevices() {
     const empty = document.createElement('li');
     empty.className = 'nearby-empty';
     empty.textContent = state.radarActive
-      ? 'Scanning for nearby devices...'
+      ? (state.dashboardMode === 'send'
+        ? 'Searching for nearby receivers...'
+        : 'Searching for nearby senders...')
       : 'No nearby devices yet.';
     elements.nearbyDeviceList.appendChild(empty);
     return;
@@ -625,10 +644,15 @@ function renderNearbyDevices() {
     const connectBtn = document.createElement('button');
     connectBtn.className = 'btn btn-secondary';
     connectBtn.type = 'button';
-    connectBtn.textContent = 'Connect';
-    connectBtn.addEventListener('click', () => {
-      joinRoom(device.code);
-    });
+    if (state.dashboardMode === 'receive') {
+      connectBtn.textContent = 'Connect';
+      connectBtn.addEventListener('click', () => {
+        joinRoom(device.code);
+      });
+    } else {
+      connectBtn.textContent = 'Detected';
+      connectBtn.disabled = true;
+    }
 
     main.appendChild(left);
     main.appendChild(connectBtn);
@@ -676,24 +700,37 @@ function normalizeDeviceName(rawName, code) {
   return value;
 }
 
-function startOfflineRadarDiscovery() {
+function startOfflineRadarDiscovery(mode = 'receive') {
   state.radarActive = true;
   state.radarScanStartedAt = Date.now();
-  state.dashboardMode = 'receive';
+  state.dashboardMode = mode === 'send' ? 'send' : 'receive';
   setElementHidden(elements.radarPanel, false);
+  updateRadarModeUI();
   clearNearbyDevices();
-  setRadarStatus('Scanning nearby devices...');
+  setRadarStatus(state.dashboardMode === 'send'
+    ? 'Searching nearby receivers...'
+    : 'Searching nearby senders...');
 
   const nativeMode = hasNativeBridge();
   if (!nativeMode) {
-    setRadarStatus('Offline Radar requires the Android app. Use QR or room code in browser mode.');
+    setRadarStatus('Nearby search requires the app for full hardware scan. Use QR or room code in browser mode.');
     return;
+  }
+
+  if (state.dashboardMode === 'send' && state.myId) {
+    invokeNativeAction(
+      'setRoomContext',
+      { roomCode: state.myId, role: 'host', targetRoom: '' },
+      { silentIfUnavailable: true },
+    );
   }
 
   invokeNativeAction('startWifiPairing', {}, { silentIfUnavailable: true });
   invokeNativeAction('startBluetoothPairing', {}, { silentIfUnavailable: true });
   invokeNativeAction('startLocationPairing', {}, { silentIfUnavailable: true });
-  logActivity('Offline Radar started (Wi-Fi + Bluetooth + location hints).');
+  logActivity(state.dashboardMode === 'send'
+    ? 'Send radar started (Wi-Fi + Bluetooth + location hints).'
+    : 'Receive radar started (Wi-Fi + Bluetooth + location hints).');
 }
 
 function stopOfflineRadarDiscovery() {
@@ -835,7 +872,9 @@ window.handleNativeBridgeMessage = function handleNativeBridgeMessage(payload) {
       deviceName: data.deviceName || '',
       deviceId: data.deviceId || '',
     });
-    setRadarStatus('Nearby device discovered. Tap Connect.');
+    setRadarStatus(state.dashboardMode === 'send'
+      ? 'Nearby device detected. Ask receiver to tap your device, or use QR/code.'
+      : 'Nearby device discovered. Tap Connect.');
     logActivity(`Native pairing code discovered: ${code}`);
     return;
   }
@@ -858,7 +897,9 @@ window.handleNativeBridgeMessage = function handleNativeBridgeMessage(payload) {
 
   if (data.type === 'nearby-device' && data.code) {
     upsertNearbyDevice(data);
-    setRadarStatus('Nearby device discovered. Tap Connect.');
+    setRadarStatus(state.dashboardMode === 'send'
+      ? 'Nearby device detected. Ask receiver to tap your device, or use QR/code.'
+      : 'Nearby device discovered. Tap Connect.');
     return;
   }
 
@@ -937,6 +978,11 @@ function initPeer(preferredId = undefined) {
       return;
     }
 
+    if (state.dashboardMode === 'send') {
+      startOfflineRadarDiscovery('send');
+      setRadarStatus('Searching nearby devices. If needed, use QR/code or share online link.');
+    }
+
     state.wasHosting = true;
     state.lastRoomId = id;
     updateStatus('Waiting', 'waiting');
@@ -1009,6 +1055,13 @@ function attemptReconnect() {
 }
 
 function hostRoom() {
+  if (state.myId && state.peer && !state.peer.destroyed) {
+    elements.myPeerId.textContent = state.myId;
+    generateQRCode(state.myId);
+    showSection(elements.hostingSection);
+    return;
+  }
+
   const roomId = generateRoomCode();
   state.dashboardMode = 'send';
   state.pendingJoinId = null;
@@ -1019,6 +1072,67 @@ function hostRoom() {
   updateStatus('Creating room', 'waiting');
   logActivity(`Creating room ${roomId}.`);
   initPeer(roomId);
+}
+
+function beginSendDiscovery() {
+  if (state.conn && state.conn.open) {
+    alert('Already connected. Disconnect current session first.');
+    return;
+  }
+
+  const roomId = generateRoomCode();
+  state.dashboardMode = 'send';
+  state.pendingJoinId = null;
+  state.wasHosting = true;
+  state.lastRoomId = roomId;
+
+  showSection(elements.setupSection);
+  setElementHidden(elements.radarPanel, false);
+  updateRadarModeUI();
+  clearNearbyDevices();
+  setRadarStatus('Preparing sender room and searching nearby devices...');
+  updateStatus('Preparing', 'waiting');
+  logActivity(`Preparing sender room ${roomId}.`);
+  initPeer(roomId);
+}
+
+function beginReceiveDiscovery() {
+  if (state.conn && state.conn.open) {
+    alert('Already connected. Disconnect current session first.');
+    return;
+  }
+
+  if (state.peer && !state.peer.destroyed) {
+    try {
+      state.peer.destroy();
+    } catch (error) {
+      console.warn('Previous peer destroy failed', error);
+    }
+    state.peer = null;
+    state.myId = '';
+  }
+
+  startOfflineRadarDiscovery('receive');
+  updateStatus('Searching', 'waiting');
+}
+
+function shareOnlineLink() {
+  if (!state.myId) {
+    alert('Sender room is still starting. Please try again in a moment.');
+    return;
+  }
+
+  const link = generateJoinUrl(state.myId);
+  const text = `Join my ShareVia room: ${state.myId}`;
+
+  if (navigator.share) {
+    navigator.share({ title: 'ShareVia Room', text, url: link }).catch(() => {
+      copyText(link, 'Join link');
+    });
+    return;
+  }
+
+  copyText(link, 'Join link');
 }
 
 function joinRoom(inputRoomId) {
@@ -1107,6 +1221,7 @@ function resetToSetup(options = {}) {
     state.radarActive = false;
     clearNearbyDevices();
     setElementHidden(elements.radarPanel, true);
+    updateRadarModeUI();
     setRadarStatus('Tap Receive to start nearby scan.');
 
     invokeNativeAction('stopTransferService', {}, { silentIfUnavailable: true });
@@ -1789,10 +1904,10 @@ function registerServiceWorker() {
 }
 
 function bindEvents() {
-  elements.btnDashboardSend && elements.btnDashboardSend.addEventListener('click', hostRoom);
-  elements.btnDashboardReceive && elements.btnDashboardReceive.addEventListener('click', startOfflineRadarDiscovery);
+  elements.btnDashboardSend && elements.btnDashboardSend.addEventListener('click', beginSendDiscovery);
+  elements.btnDashboardReceive && elements.btnDashboardReceive.addEventListener('click', beginReceiveDiscovery);
 
-  document.getElementById('btn-scan').addEventListener('click', startScanner);
+  elements.btnScan && elements.btnScan.addEventListener('click', startScanner);
   document.getElementById('btn-close-scanner').addEventListener('click', stopScanner);
   document.getElementById('btn-cancel-host').addEventListener('click', () => resetToSetup({ destroyPeer: true }));
   document.getElementById('btn-join').addEventListener('click', () => joinRoom(elements.joinIdInput.value));
@@ -1803,6 +1918,8 @@ function bindEvents() {
     saveAdvancedConfig();
   });
   document.getElementById('btn-send-note').addEventListener('click', queueNote);
+  elements.btnShowMyCode && elements.btnShowMyCode.addEventListener('click', hostRoom);
+  elements.btnShareOnlineLink && elements.btnShareOnlineLink.addEventListener('click', shareOnlineLink);
 
   elements.btnNativeWifi && elements.btnNativeWifi.addEventListener('click', () => invokeNativeAction('startWifiPairing'));
   elements.btnNativeBluetooth && elements.btnNativeBluetooth.addEventListener('click', () => invokeNativeAction('startBluetoothPairing'));
@@ -1887,10 +2004,13 @@ function initialize() {
   }
   initializeDone = true;
 
+  document.body.classList.toggle('native-mode', hasNativeBridge());
+
   applyConfigToUI();
   updateTransportBadge();
   updateStatus('Disconnected', 'disconnected');
   setElementHidden(elements.radarPanel, true);
+  updateRadarModeUI();
   setRadarStatus('Tap Receive to start nearby scan.');
   bindEvents();
   try {

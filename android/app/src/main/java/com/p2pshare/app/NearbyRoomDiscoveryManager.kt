@@ -2,6 +2,7 @@ package com.ShareVia.app
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.AdvertisingOptions
 import com.google.android.gms.nearby.connection.ConnectionInfo
@@ -25,33 +26,37 @@ class NearbyRoomDiscoveryManager(
     private val appContext = context.applicationContext
     private val connectionsClient: ConnectionsClient = Nearby.getConnectionsClient(appContext)
     private var localRoomCode: String? = null
+    private val endpointNames: MutableMap<String, String> = mutableMapOf()
 
     @SuppressLint("MissingPermission")
-    fun start(roomCode: String) {
+    fun start(roomCode: String?, advertise: Boolean = true) {
         val normalizedRoom = normalizeRoomCode(roomCode)
-        if (normalizedRoom == null) {
+        if (advertise && normalizedRoom == null) {
             onInfo("Nearby pairing skipped: invalid room code.")
             return
         }
 
         stop()
         localRoomCode = normalizedRoom
-
-        val endpointName = "$ENDPOINT_PREFIX$normalizedRoom"
         val strategy = Strategy.P2P_CLUSTER
 
-        runCatching {
-            val advertisingOptions = AdvertisingOptions.Builder().setStrategy(strategy).build()
-            connectionsClient.startAdvertising(
-                endpointName,
-                SERVICE_ID,
-                connectionLifecycleCallback,
-                advertisingOptions,
-            ).addOnFailureListener {
-                onInfo("Nearby advertise failed: ${it.message ?: "unknown error"}")
+        if (advertise && normalizedRoom != null) {
+            val endpointName = buildEndpointName(normalizedRoom)
+            runCatching {
+                val advertisingOptions = AdvertisingOptions.Builder().setStrategy(strategy).build()
+                connectionsClient.startAdvertising(
+                    endpointName,
+                    SERVICE_ID,
+                    connectionLifecycleCallback,
+                    advertisingOptions,
+                ).addOnFailureListener {
+                    onInfo("Nearby advertise failed: ${it.message ?: "unknown error"}")
+                }
+            }.onFailure {
+                onInfo("Nearby advertise failed to start: ${it.message ?: "unknown error"}")
             }
-        }.onFailure {
-            onInfo("Nearby advertise failed to start: ${it.message ?: "unknown error"}")
+        } else {
+            onInfo("Nearby scan-only mode started.")
         }
 
         runCatching {
@@ -78,18 +83,22 @@ class NearbyRoomDiscoveryManager(
     @SuppressLint("MissingPermission")
     private fun connectToEndpoint(endpointId: String, endpointName: String?) {
         val advertisedCode = extractRoomCode(endpointName)
+        val displayName = extractDisplayName(endpointName)
+        if (!displayName.isNullOrBlank()) {
+            endpointNames[endpointId] = displayName
+        }
         if (advertisedCode != null) {
             onDiscoveryHint(
                 NativeDiscoveryHint(
                     code = advertisedCode,
                     source = "nearby",
-                    deviceName = endpointName,
+                    deviceName = displayName ?: endpointName,
                     deviceId = endpointId,
                 ),
             )
         }
 
-        val requesterName = "$ENDPOINT_PREFIX${localRoomCode ?: generateRoomCode()}"
+        val requesterName = buildEndpointName(localRoomCode ?: generateRoomCode())
 
         runCatching {
             connectionsClient.requestConnection(
@@ -129,12 +138,16 @@ class NearbyRoomDiscoveryManager(
             override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
                 val endpointName = connectionInfo.endpointName
                 val endpointCode = extractRoomCode(endpointName)
+                val displayName = extractDisplayName(endpointName)
+                if (!displayName.isNullOrBlank()) {
+                    endpointNames[endpointId] = displayName
+                }
                 if (endpointCode != null) {
                     onDiscoveryHint(
                         NativeDiscoveryHint(
                             code = endpointCode,
                             source = "nearby",
-                            deviceName = endpointName,
+                            deviceName = displayName ?: endpointName,
                             deviceId = endpointId,
                         ),
                     )
@@ -159,6 +172,7 @@ class NearbyRoomDiscoveryManager(
             }
 
             override fun onDisconnected(endpointId: String) {
+                endpointNames.remove(endpointId)
                 onInfo("Nearby disconnected: $endpointId")
             }
         }
@@ -173,7 +187,7 @@ class NearbyRoomDiscoveryManager(
                     NativeDiscoveryHint(
                         code = code,
                         source = "nearby",
-                        deviceName = endpointId,
+                        deviceName = endpointNames[endpointId] ?: endpointId,
                         deviceId = endpointId,
                     ),
                 )
@@ -184,9 +198,46 @@ class NearbyRoomDiscoveryManager(
             }
         }
 
+    private fun buildEndpointName(roomCode: String): String {
+        val alias = localDeviceAlias()
+        return "$ENDPOINT_PREFIX$roomCode|$alias"
+    }
+
+    private fun localDeviceAlias(): String {
+        val manufacturer = Build.MANUFACTURER.orEmpty().trim()
+        val model = Build.MODEL.orEmpty().trim()
+        val combined =
+            when {
+                manufacturer.isBlank() -> model
+                model.startsWith(manufacturer, ignoreCase = true) -> model
+                else -> "$manufacturer $model"
+            }
+
+        return combined
+            .replace(Regex("[^A-Za-z0-9 _-]"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(24)
+            .ifBlank { "Android Device" }
+    }
+
+    private fun extractDisplayName(endpointName: String?): String? {
+        val raw = endpointName?.trim().orEmpty()
+        if (raw.isBlank()) {
+            return null
+        }
+
+        val pipeIndex = raw.indexOf('|')
+        if (pipeIndex >= 0 && pipeIndex < raw.lastIndex) {
+            return raw.substring(pipeIndex + 1).trim().ifBlank { null }
+        }
+
+        return if (raw.startsWith(ENDPOINT_PREFIX)) null else raw
+    }
+
     companion object {
         private const val SERVICE_ID = "com.ShareVia.app.nearby.room"
-        private const val ENDPOINT_PREFIX = "CV-"
+        private const val ENDPOINT_PREFIX = "SV-"
     }
 }
 

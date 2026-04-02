@@ -36,7 +36,7 @@
     <main class="main-grid">
       <section id="setup-section" class="panel active">
         <h2>Quick Share</h2>
-        <p class="subtitle">Send or receive instantly. Offline Radar detects nearby devices over Bluetooth and Wi-Fi.</p>
+        <p class="subtitle">Tap Send or Receive to search nearby devices. If discovery fails, use QR/code or online link.</p>
 
         <div class="dashboard-grid">
           <button id="btn-dashboard-send" class="dashboard-card send" type="button">
@@ -56,15 +56,21 @@
           </div>
           <p id="radar-status" class="radar-status">Tap <strong>Receive</strong> to start nearby scan.</p>
           <ul id="nearby-device-list" class="nearby-device-list"></ul>
-          <div id="native-actions" class="native-actions">
+
+          <div class="radar-actions">
+            <button id="btn-show-my-code" class="btn btn-secondary hidden" type="button">Show My QR/Code</button>
+            <button id="btn-share-online-link" class="btn btn-ghost hidden" type="button">Share Online Link</button>
+            <button id="btn-scan" class="btn btn-dark" type="button">Scan QR</button>
+          </div>
+
+          <div id="native-actions" class="native-actions hidden">
             <button id="btn-native-wifi" class="btn btn-ghost" type="button">Wi-Fi Pairing</button>
             <button id="btn-native-bluetooth" class="btn btn-ghost" type="button">Bluetooth Pairing</button>
             <button id="btn-native-nfc" class="btn btn-ghost" type="button">NFC Pairing</button>
             <button id="btn-native-location" class="btn btn-ghost" type="button">Location Hint</button>
-            <button id="btn-scan" class="btn btn-dark" type="button">Scan QR</button>
           </div>
 
-          <div class="join-inline">
+          <div id="join-inline" class="join-inline">
             <input type="text" id="join-id" placeholder="Enter 6-digit room code" inputmode="numeric" maxlength="6">
             <button id="btn-join" class="btn btn-secondary">Join</button>
           </div>
@@ -100,7 +106,7 @@
               </label>
               <label class="field">
                 <span>TURN Credential</span>
-                <input id="ice-turn-credential" type="password" placeholder="turn-password">
+                <input id="ice-turn-credential" type="password" placeholder="turn-password" autocomplete="new-password">
               </label>
               <label class="field">
                 <span>Chunk Size</span>

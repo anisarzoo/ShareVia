@@ -34,9 +34,9 @@ class BleRoomDiscoveryManager(
     private var running = false
 
     @SuppressLint("MissingPermission")
-    fun start(roomCode: String) {
+    fun start(roomCode: String?, advertise: Boolean = true) {
         val normalizedRoom = normalizeRoomCode(roomCode)
-        if (normalizedRoom == null) {
+        if (advertise && normalizedRoom == null) {
             onInfo("BLE pairing skipped: invalid room code.")
             return
         }
@@ -59,7 +59,11 @@ class BleRoomDiscoveryManager(
         advertiser = adapter.bluetoothLeAdvertiser
 
         startScan()
-        startAdvertising(normalizedRoom)
+        if (advertise && normalizedRoom != null) {
+            startAdvertising(normalizedRoom)
+        } else {
+            onInfo("BLE scan-only mode started.")
+        }
         scheduleAutoStop()
     }
 

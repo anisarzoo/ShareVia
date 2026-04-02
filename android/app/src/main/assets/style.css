@@ -42,16 +42,6 @@ body {
   padding-top: var(--safe-top);
 }
 
-body.native-mode {
-  /* Ensure a minimum spacing for the Android status bar even if env() returns 0 */
-  padding-top: max(var(--safe-top), 28px);
-}
-
-body.native-mode .topbar {
-  /* Push the sticky header down accordingly */
-  top: calc(max(var(--safe-top), 28px) + 8px);
-}
-
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -117,8 +107,14 @@ body.native-mode .topbar {
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(12px);
   position: sticky;
-  top: calc(var(--safe-top) + 8px);
+  top: 8px;
   z-index: 5;
+}
+
+/* In native app mode, avoid sticky offset overlap with the next card. */
+body.native-mode .topbar {
+  position: relative;
+  top: 0;
 }
 
 .brand {
@@ -538,6 +534,13 @@ textarea {
 }
 
 .native-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.radar-actions {
   margin-top: 10px;
   display: flex;
   flex-wrap: wrap;

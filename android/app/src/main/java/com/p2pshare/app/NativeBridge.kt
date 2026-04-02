@@ -45,13 +45,19 @@ class NativeBridge(
         }
 
         val announcedRoom = if (role.equals("idle", ignoreCase = true)) null else activePairingRoomCode()
-        val discoveryRoom = announcedRoom ?: generateRoomCode()
-        bleRoomDiscoveryManager.start(discoveryRoom)
-        nearbyRoomDiscoveryManager.start(discoveryRoom)
+        val canAdvertise = announcedRoom != null
+        bleRoomDiscoveryManager.start(announcedRoom, advertise = canAdvertise)
+        nearbyRoomDiscoveryManager.start(announcedRoom, advertise = canAdvertise)
         if (announcedRoom != null) {
             sendPairingCode(announcedRoom, source = "bluetooth")
         }
-        sendInfo("Bluetooth + Nearby pairing started.")
+        sendInfo(
+            if (canAdvertise) {
+                "Bluetooth + Nearby pairing started."
+            } else {
+                "Bluetooth + Nearby scan started."
+            },
+        )
     }
 
     @JavascriptInterface
@@ -61,13 +67,23 @@ class NativeBridge(
         }
 
         val announcedRoom = if (role.equals("idle", ignoreCase = true)) null else activePairingRoomCode()
-        val discoveryRoom = announcedRoom ?: generateRoomCode()
-        nearbyRoomDiscoveryManager.start(discoveryRoom)
-        locationPairingManager.start(announcedRoom)
+        val canAdvertise = announcedRoom != null
+        nearbyRoomDiscoveryManager.start(announcedRoom, advertise = canAdvertise)
+        if (canAdvertise) {
+            locationPairingManager.start(announcedRoom)
+        } else {
+            locationPairingManager.stop()
+        }
         if (announcedRoom != null) {
             sendPairingCode(announcedRoom, source = "wifi")
         }
-        sendInfo("Wi-Fi/Nearby pairing started.")
+        sendInfo(
+            if (canAdvertise) {
+                "Wi-Fi/Nearby pairing started."
+            } else {
+                "Wi-Fi/Nearby scan started."
+            },
+        )
     }
 
     @JavascriptInterface
