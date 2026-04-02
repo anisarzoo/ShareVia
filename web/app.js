@@ -19,6 +19,7 @@ const RECONNECT_MAX_ATTEMPTS = 3;
 const RECONNECT_DELAY = 2000;
 const MAX_HISTORY_ENTRIES = 300;
 const MAX_RECEIVED_ARCHIVE_ITEMS = 300;
+const JSZIP_CDN_URL = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
 
 const state = {
   peer: null,
@@ -101,6 +102,9 @@ const elements = {
   capLocation: document.getElementById('cap-location'),
   capNative: document.getElementById('cap-native'),
 };
+
+let initializeDone = false;
+let jsZipLoadPromise = null;
 
 function loadConfig() {
   try {
@@ -423,6 +427,20 @@ function setElementHidden(element, hidden) {
   element.classList.toggle('hidden', hidden);
 }
 
+function applyNativeSafeTopInset() {
+  const nativeMode = hasNativeBridge();
+  const isAndroid = /Android/i.test(navigator.userAgent || '');
+
+  if (!nativeMode || !isAndroid) {
+    return;
+  }
+
+  const visualTop = Math.max(0, Math.round(window.visualViewport ? window.visualViewport.offsetTop : 0));
+  const fallbackTop = 24;
+  const safeTop = Math.max(visualTop, fallbackTop);
+  document.documentElement.style.setProperty('--safe-top', `${safeTop}px`);
+}
+
 function detectCapabilities() {
   const nativeMode = hasNativeBridge();
   const webrtcSupported = Boolean(window.RTCPeerConnection);
@@ -434,6 +452,7 @@ function detectCapabilities() {
   setCapabilityChip(elements.capLocation, 'Location', nativeMode, nativeMode ? 'native app available' : 'native app required');
   setCapabilityChip(elements.capNative, 'Native Bridge', nativeMode, nativeMode ? 'app mode' : 'web mode');
 
+  if (elements.capabilityNote) {
     elements.capabilityNote.textContent = nativeMode
       ? 'Native app mode detected. Pairing helpers and hardware permissions are enabled here.'
       : 'Browser mode detected. Use the Android app for Bluetooth/NFC pairing, background transfers, and OS-level permissions.';
@@ -685,6 +704,26 @@ function stopOfflineRadarDiscovery() {
 async function getJsZipCtor() {
   if (window.JSZip) {
     return window.JSZip;
+  }
+
+  if (!jsZipLoadPromise) {
+    jsZipLoadPromise = new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = JSZIP_CDN_URL;
+      script.async = true;
+      script.onload = () => resolve(window.JSZip || null);
+      script.onerror = () => resolve(null);
+      document.head.appendChild(script);
+
+      setTimeout(() => {
+        resolve(window.JSZip || null);
+      }, 3500);
+    });
+  }
+
+  const loaded = await jsZipLoadPromise;
+  if (loaded) {
+    return loaded;
   }
 
   alert('ZIP engine is unavailable right now. Reopen the app with internet once to cache JSZip.');
@@ -1843,15 +1882,31 @@ function bindEvents() {
 }
 
 function initialize() {
+  if (initializeDone) {
+    return;
+  }
+  initializeDone = true;
+
   applyConfigToUI();
   updateTransportBadge();
   updateStatus('Disconnected', 'disconnected');
   setElementHidden(elements.radarPanel, true);
   setRadarStatus('Tap Receive to start nearby scan.');
-  detectCapabilities();
   bindEvents();
+  try {
+    detectCapabilities();
+  } catch (error) {
+    console.error('Capability detection failed:', error);
+    logActivity('Capability detection failed. Basic mode is active.', 'Warning');
+  }
   setHistoryFilter('all');
   updateSaveAllButtonState();
+  applyNativeSafeTopInset();
+  window.addEventListener('resize', applyNativeSafeTopInset);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', applyNativeSafeTopInset);
+    window.visualViewport.addEventListener('scroll', applyNativeSafeTopInset);
+  }
   registerServiceWorker();
 
   // Mobile tab suspension resilience: when user returns from WhatsApp etc.,
@@ -1874,5 +1929,9 @@ function initialize() {
   }
 }
 
-window.addEventListener('load', initialize);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initialize, { once: true });
+} else {
+  initialize();
+}
 
