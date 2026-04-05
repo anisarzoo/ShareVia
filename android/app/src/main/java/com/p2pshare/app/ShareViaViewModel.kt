@@ -1,6 +1,7 @@
 package com.ShareVia.app
 
 import android.app.Application
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,10 +15,12 @@ import kotlinx.coroutines.withContext
 
 class ShareViaViewModel(
     application: Application,
-) : AndroidViewModel(application), NearbyOfflineShareManager.Listener {
-    private val profileStore = ProfileStore(application.applicationContext)
-    private val historyStore = TransferHistoryStore(application.applicationContext)
-    private val nearbyManager = NearbyOfflineShareManager(application.applicationContext, this)
+) : AndroidViewModel(application), NearbyOfflineShareManager.Listener, OnlineTransportManager.Listener {
+    private val appContext = application.applicationContext
+    private val profileStore = ProfileStore(appContext)
+    private val historyStore = TransferHistoryStore(appContext)
+    private val nearbyManager = NearbyOfflineShareManager(appContext, this)
+    private val onlineManager = OnlineTransportManager(appContext, this)
 
     private val peersByEndpoint: MutableMap<String, NearbyPeer> = mutableMapOf()
     private val transfersById: MutableMap<String, TransferItem> = mutableMapOf()
@@ -28,6 +31,7 @@ class ShareViaViewModel(
             ShareViaUiState(
                 profile = profileStore.load(),
                 history = historyStore.load(),
+                supportsNfc = appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_NFC),
             ),
         )
     val uiState = _uiState.asStateFlow()
@@ -37,6 +41,16 @@ class ShareViaViewModel(
 
     fun changeDestination(destination: DrawerDestination) {
         _uiState.value = _uiState.value.copy(destination = destination)
+    }
+
+    fun selectMode(mode: ShareMode) {
+        _uiState.value = _uiState.value.copy(selectedMode = mode)
+        pushMessage(
+            when (mode) {
+                ShareMode.OFFLINE -> "Offline mode selected."
+                ShareMode.ONLINE -> "Online mode selected."
+            },
+        )
     }
 
     fun startNearbySession() {
@@ -55,6 +69,28 @@ class ShareViaViewModel(
         nearbyManager.sendFile(endpointId, uri)
     }
 
+    fun startOnlineSession() {
+        onlineManager.start(_uiState.value.profile)
+    }
+
+    fun stopOnlineSession() {
+        onlineManager.stop()
+    }
+
+    fun hostOnlineRoom() {
+        val roomId = generateRoomCode()
+        onlineManager.hostRoom(roomId)
+    }
+
+    fun joinOnlineRoom(roomId: String) {
+        onlineManager.joinRoom(roomId)
+    }
+
+    fun leaveOnlineRoom() {
+        val current = _uiState.value.onlineRoomId ?: return
+        onlineManager.leaveRoom(current)
+    }
+
     fun saveProfileName(inputName: String) {
         val name =
             inputName
@@ -64,7 +100,12 @@ class ShareViaViewModel(
                 .ifBlank { "My Device" }
         val next = _uiState.value.profile.copy(displayName = name)
         profileStore.save(next)
-        _uiState.value = _uiState.value.copy(profile = next, statusMessage = "Profile updated. Restart Nearby to re-announce.")
+        _uiState.value =
+            _uiState.value.copy(
+                profile = next,
+                statusMessage = "Profile updated. Restart Nearby to re-announce.",
+                onlineStatusMessage = "Profile updated. Reconnect online to refresh room identity.",
+            )
         pushMessage("Profile saved.")
     }
 
@@ -121,6 +162,31 @@ class ShareViaViewModel(
         }
     }
 
+    override fun onOnlineSessionStateChanged(active: Boolean) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isOnlineSessionActive = active)
+        }
+    }
+
+    override fun onOnlineStatusMessage(message: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(onlineStatusMessage = message)
+            _messages.emit(message)
+        }
+    }
+
+    override fun onOnlineRoomChanged(roomId: String?) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(onlineRoomId = roomId)
+        }
+    }
+
+    override fun onOnlinePeerCountChanged(count: Int) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(connectedOnlinePeers = count)
+        }
+    }
+
     private suspend fun publishPeers() {
         val sorted =
             peersByEndpoint.values
@@ -163,8 +229,13 @@ class ShareViaViewModel(
         }
     }
 
+    private fun generateRoomCode(): String {
+        return (100000..999999).random().toString()
+    }
+
     override fun onCleared() {
         super.onCleared()
         nearbyManager.destroy()
+        onlineManager.destroy()
     }
 }

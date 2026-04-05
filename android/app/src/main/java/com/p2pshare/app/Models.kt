@@ -3,10 +3,20 @@ package com.ShareVia.app
 import android.net.Uri
 import java.util.UUID
 
+enum class ShareMode {
+    OFFLINE,
+    ONLINE,
+}
+
 enum class DrawerDestination {
     HOME,
+    DEVICES,
     PROFILE,
     HISTORY,
+    SETTINGS,
+    ECOSYSTEM,
+    DIAGNOSTICS,
+    TOOLS,
 }
 
 data class ShareProfile(
@@ -60,10 +70,16 @@ data class TransferHistoryEntry(
 
 data class ShareViaUiState(
     val destination: DrawerDestination = DrawerDestination.HOME,
+    val selectedMode: ShareMode = ShareMode.OFFLINE,
     val profile: ShareProfile = ShareProfile("My Device"),
     val isNearbySessionActive: Boolean = false,
+    val isOnlineSessionActive: Boolean = false,
+    val onlineRoomId: String? = null,
+    val connectedOnlinePeers: Int = 0,
     val peers: List<NearbyPeer> = emptyList(),
     val liveTransfers: List<TransferItem> = emptyList(),
     val history: List<TransferHistoryEntry> = emptyList(),
     val statusMessage: String = "Offline mode ready. Start Nearby to discover devices.",
+    val onlineStatusMessage: String = "Online mode ready. Connect to realtime hub to host/join room.",
+    val supportsNfc: Boolean = false,
 )

@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "2026-04-05",
+  "socketPath": "/v2/realtime",
+  "events": [
+    {
+      "name": "auth.hello",
+      "direction": "client->server",
+      "payload": {
+        "deviceId": "string",
+        "platform": "android|ios|windows|web|extension",
+        "appVersion": "string",
+        "sessionToken": "string?"
+      }
+    },
+    {
+      "name": "presence.update",
+      "direction": "server->client",
+      "payload": {
+        "deviceId": "string",
+        "status": "online|idle|offline",
+        "lastSeenAt": "iso-8601"
+      }
+    },
+    {
+      "name": "room.host",
+      "direction": "client->server",
+      "payload": {
+        "roomId": "string",
+        "mode": "online|offline",
+        "transportHints": [
+          "webrtc",
+          "relay"
+        ]
+      }
+    },
+    {
+      "name": "room.join",
+      "direction": "client->server",
+      "payload": {
+        "roomId": "string"
+      }
+    },
+    {
+      "name": "signal.offer",
+      "direction": "bi",
+      "payload": {
+        "roomId": "string",
+        "targetDeviceId": "string",
+        "sdp": "string"
+      }
+    },
+    {
+      "name": "signal.answer",
+      "direction": "bi",
+      "payload": {
+        "roomId": "string",
+        "targetDeviceId": "string",
+        "sdp": "string"
+      }
+    },
+    {
+      "name": "signal.candidate",
+      "direction": "bi",
+      "payload": {
+        "roomId": "string",
+        "targetDeviceId": "string",
+        "candidate": "string",
+        "sdpMid": "string?",
+        "sdpMLineIndex": "number?"
+      }
+    },
+    {
+      "name": "transfer.start",
+      "direction": "bi",
+      "payload": {
+        "transferId": "string",
+        "roomId": "string",
+        "fileName": "string",
+        "sizeBytes": "number",
+        "mimeType": "string"
+      }
+    },
+    {
+      "name": "transfer.chunk",
+      "direction": "bi",
+      "payload": {
+        "transferId": "string",
+        "index": "number",
+        "totalChunks": "number",
+        "dataBase64": "string"
+      }
+    },
+    {
+      "name": "transfer.ack",
+      "direction": "bi",
+      "payload": {
+        "transferId": "string",
+        "receivedChunks": "number",
+        "receivedBytes": "number"
+      }
+    },
+    {
+      "name": "transfer.cancel",
+      "direction": "bi",
+      "payload": {
+        "transferId": "string",
+        "reason": "string?"
+      }
+    },
+    {
+      "name": "transfer.resume",
+      "direction": "bi",
+      "payload": {
+        "transferId": "string",
+        "nextChunkIndex": "number"
+      }
+    }
+  ]
+}

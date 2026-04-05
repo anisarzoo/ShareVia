@@ -1,10 +1,8 @@
-# ShareVia Signaling Server
+# ShareVia Signaling + Realtime Server (V2)
 
-Use this service for:
-- Online room signaling with stable uptime.
-- Offline/LAN mode when internet is unavailable.
-
-Netlify can host your static web app, but this signaling process must run on an always-on Node host (Render/Fly/Railway/VPS/etc.).
+This service now supports both:
+- Legacy PeerJS signaling (`PEER_PATH`) for existing clients.
+- V2 API + realtime hub for native Android/iOS/Windows + web/extension parity.
 
 ## Start locally
 1. `cd signal-server`
@@ -12,23 +10,50 @@ Netlify can host your static web app, but this signaling process must run on an 
 3. Copy `.env.example` to `.env` and adjust values.
 4. `npm run start`
 
-Health checks:
+## Health checks
 - `http://<host>:9000/health`
 - `http://<host>:9000/ready`
 
-## Required environment
+## V2 API surface
+- `POST /v2/auth/magic-link/request`
+- `POST /v2/auth/magic-link/verify`
+- `POST /v2/device/link/start`
+- `POST /v2/device/link/confirm`
+- `GET /v2/config/ice`
+- `POST /v2/telemetry/ingest`
+- `GET /v2/telemetry/recent`
+- `WS /v2/realtime`
+
+## Core environment
 - `PORT`
 - `HOST`
 - `PEER_PATH`
+- `REALTIME_PATH`
 - `TRUST_PROXY`
 - `CORS_ORIGIN`
+- `RATE_LIMIT`
+- `RATE_LIMIT_WINDOW_MS`
+
+## Auth + device-link environment
+- `MAGIC_LINK_TTL_MS`
+- `DEVICE_LINK_TTL_MS`
+- `AUTH_DEV_ECHO_TOKEN` (local dev only)
+
+## ICE environment
+- `ICE_STUN_URLS`
+- `ICE_TURN_URLS`
+- `ICE_TURN_USERNAME`
+- `ICE_TURN_CREDENTIAL`
+- `ICE_TTL_SEC`
 
 ## Production recommendations
-- Put server behind Nginx/Caddy/Traefik with TLS.
+- Deploy this process on always-on infrastructure (Render/Fly/Railway/VPS).
+- Put server behind TLS proxy (Nginx/Caddy/Traefik) where possible.
 - Set `TRUST_PROXY=true` behind reverse proxy.
-- Restrict `CORS_ORIGIN` to your exact app origins (comma-separated).
-- Keep `ALLOW_DISCOVERY=false` unless you explicitly need peer listing.
-- Monitor process and auto-restart (PM2/systemd/container orchestration).
+- Restrict `CORS_ORIGIN` to exact app origins (comma-separated).
+- Keep `ALLOW_DISCOVERY=false` unless peer listing is explicitly needed.
+- Use proper email delivery service for magic-link messages (current flow is stubbed for backend integration).
+- Monitor `telemetry/recent` and external logs for fallback ratio, transfer failures, and reconnect spikes.
 
 ## Optional direct TLS
 You can run HTTPS directly in Node with:
@@ -36,6 +61,4 @@ You can run HTTPS directly in Node with:
 - `TLS_KEY_FILE=<path>`
 - `TLS_CERT_FILE=<path>`
 - `TLS_CA_FILE=<path>` (optional)
-
-Reverse-proxy TLS is still preferred for most deployments.
 

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "2026-04-05",
+  "protocolVersion": "sv2",
+  "modes": {
+    "offline": "Nearby-native transport (Android+iOS via Nearby; Windows via LAN service)",
+    "online": "Native WebRTC data channel, relay fallback when direct path fails"
+  },
+  "states": [
+    "queued",
+    "pairing",
+    "connecting",
+    "in_progress",
+    "paused",
+    "completed",
+    "failed",
+    "cancelled"
+  ],
+  "messageTypes": [
+    "transfer.start",
+    "transfer.chunk",
+    "transfer.ack",
+    "transfer.end",
+    "transfer.cancel",
+    "transfer.resume",
+    "transfer.note"
+  ],
+  "limits": {
+    "defaultChunkSizeBytes": 65536,
+    "maxChunkSizeBytes": 262144,
+    "defaultAckEveryChunks": 32,
+    "maxQueuedTransfersPerPeer": 16,
+    "metadataBytesMax": 32768
+  },
+  "retryPolicy": {
+    "directP2PAttempts": 2,
+    "relayFallbackEnabled": true,
+    "reconnectMaxAttempts": 8,
+    "reconnectDelayMs": 2500
+  },
+  "telemetry": {
+    "requiredTransferMetrics": [
+      "connect_ms",
+      "bytes_sent",
+      "bytes_received",
+      "throughput_bps",
+      "transport_path",
+      "fallback_used",
+      "failure_code"
+    ]
+  }
+}

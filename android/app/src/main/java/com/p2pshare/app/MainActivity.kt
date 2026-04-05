@@ -27,10 +27,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.BluetoothSearching
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -99,6 +104,7 @@ private fun ShareViaApp(viewModel: ShareViaViewModel) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var pendingEndpointForSend by rememberSaveable { mutableStateOf<String?>(null) }
+    var onlineJoinCode by rememberSaveable { mutableStateOf("") }
     var draftProfileName by rememberSaveable(uiState.profile.displayName) {
         mutableStateOf(uiState.profile.displayName)
     }
@@ -168,6 +174,15 @@ private fun ShareViaApp(viewModel: ShareViaViewModel) {
                     },
                 )
                 DrawerItem(
+                    label = "Devices",
+                    selected = uiState.destination == DrawerDestination.DEVICES,
+                    icon = { Icon(Icons.Filled.Devices, contentDescription = null) },
+                    onClick = {
+                        viewModel.changeDestination(DrawerDestination.DEVICES)
+                        scope.launch { drawerState.close() }
+                    },
+                )
+                DrawerItem(
                     label = "Profile",
                     selected = uiState.destination == DrawerDestination.PROFILE,
                     icon = { Icon(Icons.Filled.Person, contentDescription = null) },
@@ -182,6 +197,42 @@ private fun ShareViaApp(viewModel: ShareViaViewModel) {
                     icon = { Icon(Icons.Filled.History, contentDescription = null) },
                     onClick = {
                         viewModel.changeDestination(DrawerDestination.HISTORY)
+                        scope.launch { drawerState.close() }
+                    },
+                )
+                DrawerItem(
+                    label = "Settings",
+                    selected = uiState.destination == DrawerDestination.SETTINGS,
+                    icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                    onClick = {
+                        viewModel.changeDestination(DrawerDestination.SETTINGS)
+                        scope.launch { drawerState.close() }
+                    },
+                )
+                DrawerItem(
+                    label = "Ecosystem",
+                    selected = uiState.destination == DrawerDestination.ECOSYSTEM,
+                    icon = { Icon(Icons.Filled.Language, contentDescription = null) },
+                    onClick = {
+                        viewModel.changeDestination(DrawerDestination.ECOSYSTEM)
+                        scope.launch { drawerState.close() }
+                    },
+                )
+                DrawerItem(
+                    label = "Diagnostics",
+                    selected = uiState.destination == DrawerDestination.DIAGNOSTICS,
+                    icon = { Icon(Icons.Filled.BugReport, contentDescription = null) },
+                    onClick = {
+                        viewModel.changeDestination(DrawerDestination.DIAGNOSTICS)
+                        scope.launch { drawerState.close() }
+                    },
+                )
+                DrawerItem(
+                    label = "Tools",
+                    selected = uiState.destination == DrawerDestination.TOOLS,
+                    icon = { Icon(Icons.Filled.Build, contentDescription = null) },
+                    onClick = {
+                        viewModel.changeDestination(DrawerDestination.TOOLS)
                         scope.launch { drawerState.close() }
                     },
                 )
@@ -201,7 +252,11 @@ private fun ShareViaApp(viewModel: ShareViaViewModel) {
                     Column {
                         Text(uiState.profile.displayName, style = MaterialTheme.typography.titleSmall)
                         Text(
-                            text = if (uiState.isNearbySessionActive) "Nearby active" else "Nearby paused",
+                            text = buildString {
+                                append(if (uiState.isNearbySessionActive) "Offline active" else "Offline paused")
+                                append(" · ")
+                                append(if (uiState.isOnlineSessionActive) "Online active" else "Online paused")
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -216,9 +271,14 @@ private fun ShareViaApp(viewModel: ShareViaViewModel) {
                     title = {
                         Text(
                             when (uiState.destination) {
-                                DrawerDestination.HOME -> "Nearby Share"
+                                DrawerDestination.HOME -> "ShareVia"
+                                DrawerDestination.DEVICES -> "Devices"
                                 DrawerDestination.PROFILE -> "Profile"
                                 DrawerDestination.HISTORY -> "Activity History"
+                                DrawerDestination.SETTINGS -> "Settings"
+                                DrawerDestination.ECOSYSTEM -> "Ecosystem"
+                                DrawerDestination.DIAGNOSTICS -> "Diagnostics"
+                                DrawerDestination.TOOLS -> "Optional Tools"
                             },
                         )
                     },
@@ -235,6 +295,7 @@ private fun ShareViaApp(viewModel: ShareViaViewModel) {
                 DrawerDestination.HOME -> {
                     HomeScreen(
                         state = uiState,
+                        onModeSelected = viewModel::selectMode,
                         onStartNearbyClicked = {
                             val missing = nearbyPermissions().filterNot { permission ->
                                 ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
@@ -251,6 +312,21 @@ private fun ShareViaApp(viewModel: ShareViaViewModel) {
                             pendingEndpointForSend = endpointId
                             filePicker.launch(arrayOf("*/*"))
                         },
+                        onStartOnlineClicked = { viewModel.startOnlineSession() },
+                        onStopOnlineClicked = { viewModel.stopOnlineSession() },
+                        onHostOnlineClicked = { viewModel.hostOnlineRoom() },
+                        onJoinOnlineClicked = { viewModel.joinOnlineRoom(onlineJoinCode) },
+                        onLeaveOnlineClicked = { viewModel.leaveOnlineRoom() },
+                        onlineJoinCode = onlineJoinCode,
+                        onOnlineJoinCodeChanged = { onlineJoinCode = it },
+                        modifier = Modifier.padding(innerPadding),
+                    )
+                }
+
+                DrawerDestination.DEVICES -> {
+                    PlaceholderSection(
+                        title = "Device Graph",
+                        body = "Your linked devices and fast reconnect targets will appear here. Room/session parity is now shared through the V2 backend contracts.",
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
@@ -270,6 +346,38 @@ private fun ShareViaApp(viewModel: ShareViaViewModel) {
                     HistoryScreen(
                         history = uiState.history,
                         onClearClicked = { viewModel.clearHistory() },
+                        modifier = Modifier.padding(innerPadding),
+                    )
+                }
+
+                DrawerDestination.SETTINGS -> {
+                    PlaceholderSection(
+                        title = "Transfer Settings",
+                        body = "Mode-level controls, ICE policy, fallback preferences, and account/device-link settings are being migrated into this native panel.",
+                        modifier = Modifier.padding(innerPadding),
+                    )
+                }
+
+                DrawerDestination.ECOSYSTEM -> {
+                    PlaceholderSection(
+                        title = "Ecosystem",
+                        body = "Website, browser extension, and desktop handoff controls will live here so users can move between surfaces without friction.",
+                        modifier = Modifier.padding(innerPadding),
+                    )
+                }
+
+                DrawerDestination.DIAGNOSTICS -> {
+                    PlaceholderSection(
+                        title = "Diagnostics",
+                        body = "Transport health, fallback ratio, throughput snapshots, and realtime socket status are planned for this screen.",
+                        modifier = Modifier.padding(innerPadding),
+                    )
+                }
+
+                DrawerDestination.TOOLS -> {
+                    PlaceholderSection(
+                        title = "Optional Tools",
+                        body = "Advanced utilities stay out of home flow and remain optional, keeping core transfer UX clean and fast.",
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
@@ -297,10 +405,18 @@ private fun DrawerItem(
 @Composable
 private fun HomeScreen(
     state: ShareViaUiState,
+    onModeSelected: (ShareMode) -> Unit,
     onStartNearbyClicked: () -> Unit,
     onStopNearbyClicked: () -> Unit,
     onConnectClicked: (String) -> Unit,
     onSendFileClicked: (String) -> Unit,
+    onStartOnlineClicked: () -> Unit,
+    onStopOnlineClicked: () -> Unit,
+    onHostOnlineClicked: () -> Unit,
+    onJoinOnlineClicked: () -> Unit,
+    onLeaveOnlineClicked: () -> Unit,
+    onlineJoinCode: String,
+    onOnlineJoinCodeChanged: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -311,69 +427,54 @@ private fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Card(
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.AutoMirrored.Outlined.BluetoothSearching, contentDescription = null)
-                    Text(
-                        "Offline-First Nearby",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
+                Text("Quick Connect", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Device discovery and transfer use Nearby P2P directly, so internet is optional.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    "Flight mode can still work if Bluetooth is manually enabled.",
+                    "Choose a sharing mode. Core transfer stays fast; advanced tools remain in sidebar.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = onStartNearbyClicked) {
-                        Text(if (state.isNearbySessionActive) "Restart Nearby" else "Start Nearby")
+                    Button(
+                        onClick = { onModeSelected(ShareMode.OFFLINE) },
+                        enabled = state.selectedMode != ShareMode.OFFLINE,
+                    ) {
+                        Text("Offline")
                     }
-                    OutlinedButton(onClick = onStopNearbyClicked, enabled = state.isNearbySessionActive) {
-                        Text("Stop")
+                    Button(
+                        onClick = { onModeSelected(ShareMode.ONLINE) },
+                        enabled = state.selectedMode != ShareMode.ONLINE,
+                    ) {
+                        Text("Online")
                     }
                 }
             }
         }
 
-        Text(
-            text = "Status: ${state.statusMessage}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Text(
-            text = "Nearby Devices",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (state.peers.isEmpty()) {
-            EmptyLabel("No devices found yet. Keep both phones on this screen while Nearby is active.")
+        if (state.selectedMode == ShareMode.OFFLINE) {
+            OfflineHomePanel(
+                state = state,
+                onStartNearbyClicked = onStartNearbyClicked,
+                onStopNearbyClicked = onStopNearbyClicked,
+                onConnectClicked = onConnectClicked,
+                onSendFileClicked = onSendFileClicked,
+            )
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f, fill = false)) {
-                items(state.peers, key = { it.endpointId }) { peer ->
-                    PeerCard(
-                        peer = peer,
-                        onConnectClicked = { onConnectClicked(peer.endpointId) },
-                        onSendFileClicked = { onSendFileClicked(peer.endpointId) },
-                    )
-                }
-            }
+            OnlineHomePanel(
+                state = state,
+                onStartOnlineClicked = onStartOnlineClicked,
+                onStopOnlineClicked = onStopOnlineClicked,
+                onHostOnlineClicked = onHostOnlineClicked,
+                onJoinOnlineClicked = onJoinOnlineClicked,
+                onLeaveOnlineClicked = onLeaveOnlineClicked,
+                onlineJoinCode = onlineJoinCode,
+                onOnlineJoinCodeChanged = onOnlineJoinCodeChanged,
+            )
         }
 
         if (state.liveTransfers.isNotEmpty()) {
@@ -382,13 +483,185 @@ private fun HomeScreen(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth().height(220.dp),
+            ) {
                 items(state.liveTransfers.take(8), key = { it.transferId }) { transfer ->
                     TransferCard(transfer = transfer)
                 }
             }
         } else {
             EmptyLabel("No active transfers.")
+        }
+    }
+}
+
+@Composable
+private fun OfflineHomePanel(
+    state: ShareViaUiState,
+    onStartNearbyClicked: () -> Unit,
+    onStopNearbyClicked: () -> Unit,
+    onConnectClicked: (String) -> Unit,
+    onSendFileClicked: (String) -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.AutoMirrored.Outlined.BluetoothSearching, contentDescription = null)
+                Text(
+                    "Offline Nearby",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                "Device discovery and transfer use Nearby P2P directly. Internet is optional.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "NFC quick action: ${if (state.supportsNfc) "Supported" else "Not available on this device"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onStartNearbyClicked) {
+                    Text(if (state.isNearbySessionActive) "Restart Nearby" else "Start Nearby")
+                }
+                OutlinedButton(onClick = onStopNearbyClicked, enabled = state.isNearbySessionActive) {
+                    Text("Stop")
+                }
+            }
+        }
+    }
+
+    Text(
+        text = "Status: ${state.statusMessage}",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    Text(
+        text = "Nearby Devices",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    if (state.peers.isEmpty()) {
+        EmptyLabel("No devices found yet. Keep both phones on this screen while Nearby is active.")
+    } else {
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth().height(220.dp),
+        ) {
+            items(state.peers, key = { it.endpointId }) { peer ->
+                PeerCard(
+                    peer = peer,
+                    onConnectClicked = { onConnectClicked(peer.endpointId) },
+                    onSendFileClicked = { onSendFileClicked(peer.endpointId) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnlineHomePanel(
+    state: ShareViaUiState,
+    onStartOnlineClicked: () -> Unit,
+    onStopOnlineClicked: () -> Unit,
+    onHostOnlineClicked: () -> Unit,
+    onJoinOnlineClicked: () -> Unit,
+    onLeaveOnlineClicked: () -> Unit,
+    onlineJoinCode: String,
+    onOnlineJoinCodeChanged: (String) -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                "Online P2P + Relay Fallback",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Native realtime session uses direct path first, then relay fallback if route fails.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "Status: ${state.onlineStatusMessage}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onStartOnlineClicked, enabled = !state.isOnlineSessionActive) {
+                    Text("Connect Hub")
+                }
+                OutlinedButton(onClick = onStopOnlineClicked, enabled = state.isOnlineSessionActive) {
+                    Text("Disconnect")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onHostOnlineClicked, enabled = state.isOnlineSessionActive) {
+                    Text("Host Room")
+                }
+                OutlinedButton(
+                    onClick = onLeaveOnlineClicked,
+                    enabled = state.isOnlineSessionActive && !state.onlineRoomId.isNullOrBlank(),
+                ) {
+                    Text("Leave Room")
+                }
+            }
+            OutlinedTextField(
+                value = onlineJoinCode,
+                onValueChange = onOnlineJoinCodeChanged,
+                label = { Text("Join room code") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                onClick = onJoinOnlineClicked,
+                enabled = state.isOnlineSessionActive && onlineJoinCode.isNotBlank(),
+            ) {
+                Text("Join Room")
+            }
+            Text(
+                text = "Active room: ${state.onlineRoomId ?: "None"} · Peers: ${state.connectedOnlinePeers}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderSection(
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier.fillMaxSize().padding(16.dp)) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

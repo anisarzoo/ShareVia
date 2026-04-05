@@ -1,23 +1,4 @@
-:root {
-  --bg-top: #dff4ef;
-  --bg-bottom: #f8f4e9;
-  --panel-bg: rgba(255, 255, 255, 0.82);
-  --panel-border: rgba(7, 69, 63, 0.14);
-  --text-main: #062f2c;
-  --text-soft: #385e5a;
-  --brand-strong: #0b6a61;
-  --brand-mid: #169f90;
-  --accent: #f48842;
-  --danger: #c84334;
-  --success: #0d8c57;
-  --warning: #d08924;
-  --ink: #0f1d1b;
-  --radius-lg: 24px;
-  --radius-md: 16px;
-  --shadow-lg: 0 22px 50px rgba(10, 54, 49, 0.18);
-  --shadow-sm: 0 10px 24px rgba(10, 54, 49, 0.09);
-  --safe-top: env(safe-area-inset-top, 0px);
-}
+@import url('./design-tokens.css');
 
 * {
   box-sizing: border-box;

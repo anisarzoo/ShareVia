@@ -1,5 +1,6 @@
 param(
-    [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
+    [switch]$IncludeLegacyNativeAssets
 )
 
 $sourceDir = Join-Path $Root "web"
@@ -15,11 +16,18 @@ $files = @(
     "icon128.png"
 )
 
-$targets = @(
-    (Join-Path $Root "android\app\src\main\assets")
-    (Join-Path $Root "ios\ShareVia\WebAssets")
-    (Join-Path $Root "windows\ShareVia.Windows\Assets\Web")
-)
+$targets = @()
+
+if ($IncludeLegacyNativeAssets) {
+    $targets += (Join-Path $Root "android\app\src\main\assets")
+    $targets += (Join-Path $Root "ios\ShareVia\WebAssets")
+    $targets += (Join-Path $Root "windows\ShareVia.Windows\Assets\Web")
+}
+else {
+    Write-Output "V2 native-first mode enabled: skipping legacy native WebAsset sync."
+    Write-Output "Use -IncludeLegacyNativeAssets only for backward compatibility migrations."
+    return
+}
 
 if (!(Test-Path $sourceDir)) {
     throw "Web source folder not found: $sourceDir"

@@ -2,6 +2,14 @@
 
 The desktop client is now native WPF (no WebView2 dependency) with offline LAN discovery and direct file transfer.
 
+## V2 WinUI migration scaffold
+- New project path: `windows/ShareVia.WinUI/`.
+- This is the migration target for the V2 shell:
+  - branded Home + sidebar module structure,
+  - unified offline/online mode model,
+  - transport state coordinator for parity with Android/iOS architecture.
+- Existing WPF project (`windows/P2PShare.Windows/`) remains the operational baseline while WinUI implementation is built out.
+
 ## Included
 - Native app shell with hamburger menu (`Home`, `Profile`, `History`).
 - `OfflineLanShareService`:

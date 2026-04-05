@@ -22,6 +22,22 @@ const MAX_RECEIVED_ARCHIVE_ITEMS = 300;
 const JSZIP_CDN_URL = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
 const DEFAULT_APP_DOWNLOAD_URL = 'https://play.google.com/store/apps/details?id=com.ShareVia.app';
 const TRANSIENT_PEER_ERROR_TYPES = new Set(['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected']);
+const V2_API = Object.freeze({
+  magicLinkRequest: '/v2/auth/magic-link/request',
+  magicLinkVerify: '/v2/auth/magic-link/verify',
+  deviceLinkStart: '/v2/device/link/start',
+  deviceLinkConfirm: '/v2/device/link/confirm',
+  iceConfig: '/v2/config/ice',
+  realtime: '/v2/realtime',
+});
+const LEGACY_TO_V2_EVENT = Object.freeze({
+  'file-start': 'transfer.start',
+  'file-chunk': 'transfer.chunk',
+  'file-end': 'transfer.end',
+  'file-ack': 'transfer.ack',
+  'file-cancel': 'transfer.cancel',
+  'text-note': 'transfer.note',
+});
 
 const state = {
   peer: null,
@@ -154,6 +170,65 @@ function loadConfig() {
 
 function persistConfig() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.config));
+}
+
+function resolveV2ApiBase() {
+  const secure = Boolean(state.config.signalingSecure);
+  const host = String(state.config.signalingHost || '').trim();
+  const port = String(state.config.signalingPort || '').trim();
+  if (!host) {
+    return '';
+  }
+  const protocol = secure ? 'https' : 'http';
+  const defaultPort = secure ? '443' : '80';
+  return `${protocol}://${host}${port && port !== defaultPort ? `:${port}` : ''}`;
+}
+
+function mapLegacyEventToV2(eventType) {
+  return LEGACY_TO_V2_EVENT[eventType] || eventType;
+}
+
+async function callV2Api(path, method = 'GET', body = undefined) {
+  const base = resolveV2ApiBase();
+  if (!base) {
+    throw new Error('Missing signaling host config for V2 API.');
+  }
+
+  const response = await fetch(`${base}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || `V2 API ${path} failed`);
+  }
+
+  return payload;
+}
+
+async function syncIceConfigFromV2() {
+  try {
+    const payload = await callV2Api(V2_API.iceConfig);
+    if (!Array.isArray(payload.iceServers)) {
+      return;
+    }
+
+    const stunServer = payload.iceServers.find((entry) => Array.isArray(entry.urls) && entry.urls.length);
+    if (stunServer && Array.isArray(stunServer.urls) && stunServer.urls.length > 0) {
+      state.config.iceStunUrl = String(stunServer.urls[0] || state.config.iceStunUrl).trim();
+      if (elements.iceStunUrl) {
+        elements.iceStunUrl.value = state.config.iceStunUrl;
+      }
+      persistConfig();
+      logActivity('Loaded ICE config from V2 backend.', 'System');
+    }
+  } catch (error) {
+    logActivity('Could not load V2 ICE config. Using local settings.', 'Warning');
+  }
 }
 
 function loadTransferHistory() {
@@ -1804,7 +1879,11 @@ function cancelTransfer(id, direction) {
   }
 
   if (targetPeerId) {
-    sendToPeer(targetPeerId, { type: 'file-cancel', transferId: rawTransferId }, { silent: true });
+    sendToPeer(
+      targetPeerId,
+      { type: 'file-cancel', v2Type: mapLegacyEventToV2('file-cancel'), transferId: rawTransferId },
+      { silent: true },
+    );
   }
 
   markTransferCancelled(id);
@@ -1971,6 +2050,7 @@ function handleIncomingFileChunk(payload, fromPeerId = '') {
   if (record.receivedChunks % state.config.ackEvery === 0 || record.receivedChunks === record.totalChunks) {
     sendToPeer(fromPeerId, {
       type: 'file-ack',
+      v2Type: mapLegacyEventToV2('file-ack'),
       transferId,
       receivedChunks: record.receivedChunks,
       receivedBytes: record.receivedBytes,
@@ -2198,6 +2278,7 @@ async function sendFileToPeer(connection, file, options = {}) {
 
   const started = safeSendToConnection(connection, {
     type: 'file-start',
+    v2Type: mapLegacyEventToV2('file-start'),
     transferId,
     name: file.name,
     size: file.size,
@@ -2232,6 +2313,7 @@ async function sendFileToPeer(connection, file, options = {}) {
 
     const sent = safeSendToConnection(connection, {
       type: 'file-chunk',
+      v2Type: mapLegacyEventToV2('file-chunk'),
       transferId,
       index,
       chunk,
@@ -2262,6 +2344,7 @@ async function sendFileToPeer(connection, file, options = {}) {
 
   safeSendToConnection(connection, {
     type: 'file-end',
+    v2Type: mapLegacyEventToV2('file-end'),
     transferId,
   }, { silent: true });
 
@@ -2304,6 +2387,7 @@ function queueNote() {
 
   safeSend({
     type: 'text-note',
+    v2Type: mapLegacyEventToV2('text-note'),
     text,
   }, { silent: true });
 
@@ -2548,6 +2632,7 @@ function initialize() {
   configurePlatformMode();
 
   applyConfigToUI();
+  syncIceConfigFromV2();
   updateTransportBadge();
   updateStatus('Disconnected', 'disconnected');
   setElementHidden(elements.radarPanel, true);

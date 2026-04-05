@@ -2,23 +2,24 @@
 
 Cross-platform split:
 - `web/`: website + web P2P experience + product marketing.
-- `android/`, `ios/`, `windows/`: native-first clients focused on real offline-first nearby sharing.
+- `android/`, `ios/`, `windows/`: native-first clients focused on offline + online transfer parity.
 
 ## Folders
 - `web/` - responsive website and web sharing flow.
-- `android/` - fully native Android client (Compose + Nearby Connections).
-- `ios/` - native SwiftUI + MultipeerConnectivity client.
-- `windows/` - native WPF + LAN discovery/transfer client.
-- `signal-server/` - always-on signaling service.
+- `android/` - native Android V2 shell (Compose + Nearby + realtime hub scaffold).
+- `ios/` - legacy iOS source plus new `ios/ShareViaV2/` canonical scaffold for V2.
+- `windows/` - operational WPF app plus `windows/ShareVia.WinUI/` migration scaffold.
+- `signal-server/` - always-on signaling + V2 realtime/identity/config APIs.
 - `scripts/` - helper scripts (asset sync).
+- `shared/v2/` - cross-surface contracts (design tokens, API/events, transfer protocol).
 - `docs/` - production checklist.
 
 ## Product direction
-1. Native apps are all-rounders: offline nearby transfer first, online expansion second.
-2. Website remains the web sharing channel plus marketing surface.
-3. Native app identity uses profile name + display picture to make pairing clearer.
+1. Keep home flow minimal: offline/online mode cards + fast send/receive actions.
+2. Put advanced modules in sidebar (devices, ecosystem, diagnostics, tools).
+3. Preserve native-first transport and align all clients to shared V2 contracts.
 
 ## Notes on compatibility
-- Android: Nearby Connections handles discovery + transfer in one native stack.
-- iOS: MultipeerConnectivity handles discovery + transfer in one native stack.
-- Windows: LAN broadcast discovery + direct socket transfer for local/offline sharing.
+- Android: Nearby offline path + online realtime scaffold wired.
+- iOS: V2 scaffold prepared; target transport is Nearby Swift + native online transport.
+- Windows: WPF remains active baseline while WinUI 3 migration is implemented.

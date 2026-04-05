@@ -1,0 +1,32 @@
+name: ShareViaV2
+options:
+  bundleIdPrefix: com.ShareVia
+configs:
+  Debug: debug
+  Release: release
+targets:
+  ShareViaV2:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: .
+        excludes:
+          - README.md
+          - project.yml
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: ShareVia
+        NSBluetoothAlwaysUsageDescription: Bluetooth is used for nearby transfer discovery and pairing.
+        NSLocalNetworkUsageDescription: Local network access is used for nearby and peer-to-peer transfer.
+        NSPhotoLibraryUsageDescription: Photo library access is used when you choose a profile picture.
+        NSBonjourServices:
+          - _sv-nearby-v1._tcp
+          - _sv-nearby-v1._udp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ShareVia.ios
+        SWIFT_VERSION: "5.10"
+        INFOPLIST_FILE: Info.plist
+    dependencies: []

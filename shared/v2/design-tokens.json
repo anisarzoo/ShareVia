@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "2026-04-05",
+  "brand": {
+    "name": "ShareVia",
+    "tagline": "Fast, trusted, native file transfer"
+  },
+  "typography": {
+    "fontFamilyBody": "Manrope, 'Segoe UI', sans-serif",
+    "fontFamilyHeading": "'Space Grotesk', 'Segoe UI', sans-serif",
+    "fontWeightRegular": 500,
+    "fontWeightSemibold": 700,
+    "fontWeightBold": 800
+  },
+  "color": {
+    "bgTop": "#dff4ef",
+    "bgBottom": "#f8f4e9",
+    "panelBg": "rgba(255, 255, 255, 0.82)",
+    "panelBorder": "rgba(7, 69, 63, 0.14)",
+    "textMain": "#062f2c",
+    "textSoft": "#385e5a",
+    "brandStrong": "#0b6a61",
+    "brandMid": "#169f90",
+    "accent": "#f48842",
+    "danger": "#c84334",
+    "success": "#0d8c57",
+    "warning": "#d08924",
+    "ink": "#0f1d1b"
+  },
+  "radius": {
+    "lg": 24,
+    "md": 16,
+    "sm": 12
+  },
+  "shadow": {
+    "lg": "0 22px 50px rgba(10, 54, 49, 0.18)",
+    "sm": "0 10px 24px rgba(10, 54, 49, 0.09)"
+  },
+  "status": {
+    "disconnected": "danger",
+    "waiting": "warning",
+    "connected": "success"
+  }
+}
