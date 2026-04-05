@@ -4,6 +4,8 @@ node_modules/
 
 # Android
 .gradle/
+android/.gradle-user-home/
+android/.android-user-home/
 build/
 *.iml
 local.properties

@@ -28,6 +28,8 @@ const state = {
   connections: new Map(),
   myId: '',
   pendingJoinId: null,
+  profileName: localStorage.getItem('sv_profile_name') || '',
+  profileAvatar: localStorage.getItem('sv_profile_avatar') || '',
   html5QrCode: null,
   isResetting: false,
   config: loadConfig(),
@@ -877,7 +879,7 @@ function normalizeDeviceName(rawName, code) {
   const value = String(rawName || '').trim();
   if (!value) return '';
   if (value === code) return '';
-  if (value.toUpperCase() === `CV-${code}`) return '';
+  if (value.toUpperCase() === "SV-${code}") return '';
   return value;
 }
 
@@ -901,7 +903,7 @@ function startOfflineRadarDiscovery(mode = 'receive') {
   if (state.dashboardMode === 'send' && state.myId) {
     invokeNativeAction(
       'setRoomContext',
-      { roomCode: state.myId, role: 'host', targetRoom: '' },
+      { roomCode: state.myId, role: 'host', targetRoom: '', profileName: state.profileName },
       { silentIfUnavailable: true },
     );
   }
@@ -2596,3 +2598,92 @@ if (document.readyState === 'loading') {
 
 
 
+
+
+function setupSidebarEvents() {
+  if (!elements.btnMenuOpen) return;
+  
+  // Load initial profile data to UI
+  if (state.profileName) elements.profileNameInput.value = state.profileName;
+  if (state.profileAvatar) elements.profileAvatarPreview.src = state.profileAvatar;
+
+  // Open/Close
+  elements.btnMenuOpen.addEventListener('click', () => {
+    elements.sidebarOverlay.classList.remove('hidden');
+    elements.sidebarMenu.classList.remove('closed');
+  });
+  
+  const closeMenu = () => {
+    elements.sidebarOverlay.classList.add('hidden');
+    elements.sidebarMenu.classList.add('closed');
+  };
+  
+  elements.btnMenuClose.addEventListener('click', closeMenu);
+  elements.sidebarOverlay.addEventListener('click', closeMenu);
+  
+  // Save Profile
+  elements.btnSaveProfile.addEventListener('click', () => {
+    const name = elements.profileNameInput.value.trim();
+    state.profileName = name;
+    localStorage.setItem('sv_profile_name', name);
+    alert('Profile saved successfully!');
+    elements.btnSaveProfile.textContent = "Saved ?";
+    setTimeout(() => { elements.btnSaveProfile.textContent = "Save"; }, 2000);
+  });
+  
+  // Avatar logic
+  elements.btnChangeAvatar.addEventListener('click', () => {
+    elements.profileAvatarInput.click();
+  });
+  
+  elements.profileAvatarInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const url = event.target.result;
+        state.profileAvatar = url;
+        localStorage.setItem('sv_profile_avatar', url);
+        elements.profileAvatarPreview.src = url;
+    };
+    reader.readAsDataURL(file);
+  });
+  
+  // Offline PC flow
+  elements.btnMenuSendPc.addEventListener('click', () => {
+    closeMenu();
+    resetToSetup({ destroyPeer: true });
+    showOfflinePcPanel();
+  });
+  
+  elements.btnClosePcPanel.addEventListener('click', () => {
+    elements.offlinePcPanel.classList.add('hidden');
+    elements.dashboardGrid.classList.remove('hidden');
+  });
+  
+  elements.btnCopyPcUrl.addEventListener('click', () => {
+    copyText(elements.pcServerUrl.value, "PC Server URL");
+  });
+}
+
+function showOfflinePcPanel() {
+  // Hide normal dashboard
+  elements.dashboardGrid.classList.add('hidden');
+  elements.offlinePcPanel.classList.remove('hidden');
+  
+  // Generate QR for pseudo local IP (Since actual local IP detection in JS needs WebRTC tricks or Native help, we placeholder to standard format temporarily or Native IP)
+  const serverUrl = "http://192.168.43.1:8080/";
+  elements.pcServerUrl.value = serverUrl;
+  
+  elements.pcQrContainer.innerHTML = '';
+  new QRCode(elements.pcQrContainer, {
+    text: serverUrl,
+    width: 200,
+    height: 200,
+    colorDark: '#0d3f3a',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+  
+  // In a real android impl, we would invokeNativeAction('startLocalHttpServer') here.
+}

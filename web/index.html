@@ -44,6 +44,23 @@
           <button id="btn-mode-online" class="mode-tab" type="button" role="tab" aria-selected="false">🌐 Online</button>
         </div>
 
+        <div id="offline-pc-panel" class="panel card hidden" style="text-align: center; margin-bottom: 24px;">
+          <h3>Send to PC (Hotspot)</h3>
+          <p class="subtitle" style="font-size: 0.9rem; margin-bottom: 16px;">Share your files instantly with any PC, no internet or app needed.</p>
+          <ol style="text-align: left; font-size: 0.95rem; line-height: 1.6; margin-bottom: 20px;">
+            <li>Turn on your phone's <strong>Wi-Fi Hotspot</strong>.</li>
+            <li>Connect your PC to your Hotspot.</li>
+            <li>Scan this QR on your PC, or manually go to the URL below in your PC browser:</li>
+          </ol>
+          <div id="pc-qr-container" style="background: white; padding: 16px; border-radius: 12px; display: inline-block; margin-bottom: 16px;"></div>
+          <div class="input-group" style="justify-content: center; margin-bottom: 16px;">
+            <input type="text" id="pc-server-url" readonly value="http://192.168.x.x:8080/" style="text-align: center; max-width: 250px;">
+            <button id="btn-copy-pc-url" class="btn secondary">Copy</button>
+          </div>
+          <p class="hint">Ensure ShareVia app stays open on your phone during transfer.</p>
+          <button id="btn-close-pc-panel" class="btn default" style="width: 100%; margin-top: 16px;">Close</button>
+        </div>
+
         <div id="dashboard-grid" class="dashboard-grid">
           <button id="btn-dashboard-send" class="dashboard-card send" type="button">
             <span class="dashboard-icon">↑</span>

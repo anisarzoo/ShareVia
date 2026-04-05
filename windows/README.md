@@ -1,23 +1,21 @@
-# Windows App (Production Starter)
+# Windows App (Native Offline-First)
 
-This folder contains a WPF + WebView2 desktop app wrapper for ShareVia.
+The desktop client is now native WPF (no WebView2 dependency) with offline LAN discovery and direct file transfer.
 
 ## Included
-- `ShareVia.Windows.csproj` (.NET 8)
-- `MainWindow.xaml` + `MainWindow.xaml.cs`
-- `Services/NativeBridgeService.cs`
-- `Assets/Web/` for the web bundle
+- Native app shell with hamburger menu (`Home`, `Profile`, `History`).
+- `OfflineLanShareService`:
+  - UDP broadcast discovery on local network,
+  - direct TCP file transfer between peers.
+- Profile editor with display name + display picture.
+- In-app transfer history section.
 
 ## Build
-1. Copy files from `../web` into `ShareVia.Windows/Assets/Web/`.
+1. Install .NET 8 SDK.
 2. Run:
-   - `dotnet restore windows/ShareVia.Windows/ShareVia.Windows.csproj`
-   - `dotnet build windows/ShareVia.Windows/ShareVia.Windows.csproj -c Release`
+   - `dotnet restore windows/P2PShare.Windows/P2PShare.Windows.csproj`
+   - `dotnet build windows/P2PShare.Windows/P2PShare.Windows.csproj -c Release`
 
-## Native bridge actions
-- `startBluetoothPairing`
-- `startNfcPairing`
-- `startLocationPairing`
-
-Current service returns pairing codes so the web flow works immediately.
-Replace service internals with WinRT Bluetooth/NFC/location integrations for production hardware workflows.
+## Product role
+- Native desktop app: primary offline/online sharing client.
+- Website: web sharing and product marketing channel.

@@ -1,39 +1,28 @@
-# Android App (Production Starter)
+# Android App (Native Offline-First)
 
-This folder contains a native Android WebView wrapper for the upgraded ShareVia web client.
+This module is now a native Compose app, not a WebView wrapper.
 
-## Why this structure
-- Native permissions for Bluetooth, NFC, camera, and location.
-- JavaScript bridge (`NativeP2PBridge`) so web UI can trigger native pairing helpers.
-- Local asset mode (`file:///android_asset/index.html`) for offline startup.
+## What it includes
+- Native UI with hamburger drawer (`Home`, `Profile`, `History`).
+- Profile identity (display name + display picture) shown during nearby discovery.
+- Nearby Connections as one consistent stack for:
+  - device discovery,
+  - pairing,
+  - file payload transfer.
+- Activity history stored on-device.
 
 ## Build
-1. Copy `../web/*` assets into `app/src/main/assets/`.
-2. Open this folder in Android Studio (`android/`).
-3. Sync Gradle and run on Android 7.0+ (API 24+).
+1. Open `android/` in Android Studio.
+2. Sync Gradle.
+3. Run:
+   - `./gradlew :app:compileDebugKotlin`
+   - `./gradlew :app:assembleDebug`
 
-## Native bridge actions
-- `setRoomContext`
-- `startWifiPairing`
-- `startBluetoothPairing`
-- `startNfcPairing`
-- `startLocationPairing`
-- `startTransferService`
-- `stopTransferService`
-- `stopPairing`
+## Offline behavior
+- Internet is optional.
+- Discovery + transfer are local nearby operations.
+- In flight mode, sharing can still work if Bluetooth is manually enabled.
 
-The current `NativeBridge.kt` now includes:
-- runtime permission request plumbing (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`, location, notifications),
-- foreground transfer service triggers (`TransferForegroundService`),
-- BLE scanner/advertiser discovery,
-- Nearby Connections discovery/advertising (Bluetooth/Wi-Fi transport),
-- location + Wi-Fi fingerprint pairing hints for older-device fallback,
-- callback messages back to the web UI for permission and status events.
-
-Discovery flows are now wired end-to-end, but you should still harden device-compatibility behavior on your target hardware matrix.
-
-## Security checklist
-- Keep release build minification enabled.
-- Pin your signaling endpoint and TLS cert for online mode.
-- Restrict JS bridge methods to required actions only.
-- Add runtime permission UX for Android 12+ Bluetooth permissions.
+## Notes
+- Online-mode expansion can be layered on top without routing core discovery through web code.
+- Website assets are no longer required to run the native Android app.

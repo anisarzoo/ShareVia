@@ -1,22 +1,21 @@
-# iOS App (Production Starter)
+# iOS App (Native Offline-First)
 
-This folder provides a SwiftUI + WKWebView native wrapper around the shared ShareVia web client.
+The iOS client is now native-first (`SwiftUI` + `MultipeerConnectivity`) and no longer depends on a web container.
 
 ## Included
-- `ShareViaApp.swift`: app entry point.
-- `WebContainerView.swift`: WKWebView host with JS bridge injection.
-- `Bridge/NativeBridgeCoordinator.swift`: handles native pairing callbacks.
-- `Info.plist`: camera, bluetooth, NFC, and location usage descriptions.
+- Sidebar/hamburger-friendly app shell (`Home`, `Profile`, `History`).
+- Profile identity editor (display name + display picture).
+- `OfflineShareService` for offline nearby discovery + direct file transfer.
+- Local history persistence for completed transfers.
 
 ## Build notes
-1. Create an Xcode iOS app project and add files from `ios/ShareVia/`.
-2. Add the web bundle into app resources.
-3. Ensure `NativeP2PBridge` script message handler is enabled.
+1. Open the iOS project in Xcode and include files from `ios/P2PShare/`.
+2. Ensure `Info.plist` keeps:
+   - `NSBluetoothAlwaysUsageDescription`
+   - `NSLocalNetworkUsageDescription`
+   - `NSBonjourServices`
+3. Run on physical iOS devices for nearby transfer validation.
 
-## Bridge actions implemented
-- `startBluetoothPairing`
-- `startNfcPairing`
-- `startLocationPairing`
-
-Current methods return safe pairing-code stubs so UI flow works now.
-Replace internals with production CoreBluetooth/CoreNFC/CoreLocation logic.
+## Product role
+- Native app: all-round offline/online sharing client.
+- Website: web sharing path + marketing surface.

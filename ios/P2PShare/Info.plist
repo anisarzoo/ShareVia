@@ -6,13 +6,16 @@
     <string>ShareVia</string>
     <key>CFBundleName</key>
     <string>ShareVia</string>
-    <key>NSCameraUsageDescription</key>
-    <string>Camera access is used to scan pairing QR codes.</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
-    <string>Bluetooth is used for nearby pairing and discovery.</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Location improves nearby device discovery on restricted networks.</string>
-    <key>NFCReaderUsageDescription</key>
-    <string>NFC is used for instant tap-to-pair setup.</string>
+    <string>Bluetooth is used to discover and pair nearby devices offline.</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Local network access is used for offline nearby file sharing.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Photo library access is used when you choose a profile picture.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_sv-nearby-v1._tcp</string>
+        <string>_sv-nearby-v1._udp</string>
+    </array>
 </dict>
 </plist>
