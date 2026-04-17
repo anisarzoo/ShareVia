@@ -1791,23 +1791,63 @@ function addDownloadAction(id, url, fileName) {
   const headRight = item.querySelector('.transfer-head-right');
   if (!headRight) return;
 
-  const button = document.createElement('button');
-  button.className = 'btn btn-secondary';
-  button.dataset.download = '1';
-  button.style.fontSize = '0.72rem';
-  button.style.padding = '4px 8px';
-  button.style.height = 'auto';
-  button.textContent = 'Save';
+  const buttonGroup = document.createElement('div');
+  buttonGroup.className = 'transfer-actions';
+  buttonGroup.style.display = 'flex';
+  buttonGroup.style.gap = '6px';
+  buttonGroup.dataset.download = '1';
 
-  button.addEventListener('click', () => {
+  // Save Button
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn btn-secondary';
+  saveBtn.style.fontSize = '0.72rem';
+  saveBtn.style.padding = '4px 8px';
+  saveBtn.style.height = 'auto';
+  saveBtn.textContent = 'Save';
+  saveBtn.addEventListener('click', () => {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = fileName;
     anchor.click();
   });
 
-  // Prepend to the right actions group (usually before the delete/cancel X)
-  headRight.prepend(button);
+  // Copy Button
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-secondary';
+  copyBtn.style.fontSize = '0.72rem';
+  copyBtn.style.padding = '4px 8px';
+  copyBtn.style.height = 'auto';
+  copyBtn.textContent = 'Copy';
+  copyBtn.addEventListener('click', async () => {
+    try {
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      
+      // Handle text vs binary
+      if (blob.type.startsWith('text/')) {
+        const text = await blob.text();
+        await navigator.clipboard.writeText(text);
+      } else {
+        const data = [new ClipboardItem({ [blob.type]: blob })];
+        await navigator.clipboard.write(data);
+      }
+      
+      const original = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = original; }, 1500);
+    } catch (err) {
+      console.warn('Copy failed:', err);
+      logActivity('Direct copy not supported for this file type.', 'Warning');
+      copyBtn.textContent = 'Error';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+    }
+  });
+
+  buttonGroup.appendChild(copyBtn);
+  buttonGroup.appendChild(saveBtn);
+
+  // Prepend to the right actions group
+  headRight.prepend(buttonGroup);
 }
 
 function handleIncomingData(payload, fromPeerId = '') {
