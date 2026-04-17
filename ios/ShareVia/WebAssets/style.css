@@ -685,6 +685,22 @@ body.web-join-mode footer {
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(7, 69, 63, 0.12);
   overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.transfer-item.incoming {
+  border-left: 4px solid #1565c0;
+  background: linear-gradient(to right, rgba(21, 101, 192, 0.04), rgba(255, 255, 255, 0.78));
+}
+
+.transfer-item.outgoing {
+  border-left: 4px solid #2e7d32;
+  background: linear-gradient(to right, rgba(46, 125, 50, 0.04), rgba(255, 255, 255, 0.78));
+}
+
+.transfer-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .transfer-head {

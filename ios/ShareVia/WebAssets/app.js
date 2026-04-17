@@ -1654,7 +1654,7 @@ function createTransferUI(id, name, size, direction, timestamp = Date.now()) {
 
   const wrapper = document.createElement('article');
   wrapper.id = `transfer-${id}`;
-  wrapper.className = 'transfer-item';
+  wrapper.className = `transfer-item ${direction}`;
 
   const head = document.createElement('div');
   head.className = 'transfer-head';
@@ -1787,7 +1787,7 @@ function markTransferComplete(id, statusLabel) {
 
   if (bar) bar.classList.add('complete');
   if (status && statusLabel) status.textContent = statusLabel;
-  if (speed) speed.textContent = 'Complete';
+  if (speed) speed.textContent = 'Finished';
 }
 
 function addDownloadAction(id, url, fileName) {
