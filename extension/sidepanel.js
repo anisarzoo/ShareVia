@@ -234,6 +234,7 @@ function initPeer(id = null) {
     // Add a small delay so the user can actually see the "shimmer" effect
     setTimeout(() => {
       myPeerIdEl.classList.remove('loading');
+      if (qrcodeContainer) qrcodeContainer.classList.remove('loading');
     }, 800);
 
     generateQRCode(openId);

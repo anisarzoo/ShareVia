@@ -349,6 +349,7 @@ input[type="text"]:focus {
 
 .large-code.loading {
   color: transparent !important;
+  visibility: hidden !important;
 }
 
 .large-code.loading::after {
@@ -357,7 +358,7 @@ input[type="text"]:focus {
   top: 50% !important;
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
-  width: 130px !important;
+  width: 140px !important;
   height: 1.4rem !important;
   background: linear-gradient(90deg, #d8e5e1 0%, #b6cecd 50%, #d8e5e1 100%) !important;
   background-size: 200% 100% !important;
@@ -365,6 +366,7 @@ input[type="text"]:focus {
   border-radius: 6px !important;
   z-index: 10 !important;
   display: block !important;
+  visibility: visible !important; /* Make sure the shimmer stays visible even if parent is hidden */
 }
 
 /* ---- QR Code ---- */
