@@ -110,6 +110,7 @@ const elements = {
   ackEvery: document.getElementById('ack-every'),
   btnAdvanced: document.getElementById('btn-advanced'),
   formSettings: document.getElementById('form-settings'),
+  btnHeaderDisconnect: document.getElementById('btn-header-disconnect'),
   qrSkeleton: document.getElementById('qr-skeleton'),
 };
 
@@ -420,6 +421,16 @@ function showSection(section) {
 
   section.classList.remove('hidden');
   section.classList.add('active');
+
+  // Update header disconnect button visibility and text
+  if (elements.btnHeaderDisconnect) {
+    if (section === elements.setupSection) {
+      elements.btnHeaderDisconnect.classList.add('hidden');
+    } else {
+      elements.btnHeaderDisconnect.classList.remove('hidden');
+      elements.btnHeaderDisconnect.textContent = (section === elements.hostingSection) ? 'Cancel' : 'Leave';
+    }
+  }
 }
 
 function nowLabel() {
@@ -2105,11 +2116,9 @@ function bindEvents() {
   const btnCloseScanner = document.getElementById('btn-close-scanner');
   if (btnCloseScanner) btnCloseScanner.addEventListener('click', stopScanner);
 
-  const btnCancelHost = document.getElementById('btn-cancel-host');
-  if (btnCancelHost) btnCancelHost.addEventListener('click', () => resetToSetup({ destroyPeer: true }));
-
-  const btnDisconnect = document.getElementById('btn-disconnect');
-  if (btnDisconnect) btnDisconnect.addEventListener('click', () => resetToSetup({ destroyPeer: true }));
+  if (elements.btnHeaderDisconnect) {
+    elements.btnHeaderDisconnect.addEventListener('click', () => resetToSetup({ destroyPeer: true }));
+  }
 
   document.getElementById('btn-advanced').addEventListener('click', toggleAdvancedPanel);
   elements.formSettings.addEventListener('submit', (event) => {

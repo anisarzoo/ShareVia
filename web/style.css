@@ -99,6 +99,22 @@ html {
   z-index: 5;
 }
 
+#btn-header-disconnect {
+  font-size: 0.8rem;
+  padding: 8px 14px;
+  height: auto;
+  border-radius: 12px;
+  background: rgba(200, 67, 52, 0.06);
+  border: 1px solid rgba(200, 67, 52, 0.12);
+  color: var(--danger);
+}
+
+#btn-header-disconnect:hover {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
 /* In native app mode, avoid sticky offset overlap with the next card. */
 body.native-mode .topbar {
   position: relative;

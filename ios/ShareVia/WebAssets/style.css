@@ -72,6 +72,21 @@ body {
   margin-bottom: 20px;
 }
 
+#btn-header-disconnect {
+  font-size: 0.8rem;
+  padding: 8px 14px;
+  height: auto;
+  border-radius: 12px;
+  background: rgba(200, 67, 52, 0.06);
+  border: 1px solid rgba(200, 67, 52, 0.12);
+  color: #c84334;
+}
+
+#btn-header-disconnect:hover {
+  background: #c84334;
+  color: #fff;
+}
+
 .brand {
   display: flex;
   align-items: center;
