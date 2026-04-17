@@ -344,54 +344,61 @@ input[type="text"]:focus {
   letter-spacing: 0.24em;
   font-weight: 700;
   color: var(--brand-strong);
+  position: relative;
 }
 
 .large-code.loading {
-  display: inline-block;
-  min-width: 140px;
-  height: 1.8rem;
   color: transparent !important;
-  background: linear-gradient(90deg, rgba(22, 159, 144, 0.2) 25%, rgba(22, 159, 144, 0.45) 50%, rgba(22, 159, 144, 0.2) 75%);
-  background-size: 200% 100%;
-  animation: skeleton-loading 1.2s infinite linear;
-  border-radius: 8px;
-  padding: 0 10px;
+}
+
+.large-code.loading::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 130px !important;
+  height: 1.4rem !important;
+  background: linear-gradient(90deg, #d8e5e1 0%, #b6cecd 50%, #d8e5e1 100%) !important;
+  background-size: 200% 100% !important;
+  animation: skeleton-loading 1.2s infinite linear !important;
+  border-radius: 6px !important;
+  z-index: 10 !important;
+  display: block !important;
 }
 
 /* ---- QR Code ---- */
 .qrcode-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: #fff;
-  padding: 10px;
-  border-radius: 14px;
-  margin: 0 auto 10px;
-  width: 160px;
-  height: 160px;
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  transition: opacity 0.2s ease;
-}
-
-.qrcode-container.loading {
-  position: relative;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  background: #fff !important;
+  padding: 10px !important;
+  border-radius: 14px !important;
+  margin: 0 auto 10px !important;
+  width: 160px !important;
+  height: 160px !important;
+  min-height: 160px !important;
+  box-shadow: var(--shadow-sm) !important;
+  overflow: hidden !important;
+  position: relative !important;
 }
 
 .qrcode-container.loading::after {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border-radius: 8px;
-  background: linear-gradient(90deg, #d8e5e1 25%, #b6cecd 50%, #d8e5e1 75%);
-  background-size: 200% 100%;
-  animation: skeleton-loading 1.2s infinite linear;
-  z-index: 5;
+  content: "" !important;
+  position: absolute !important;
+  inset: 12px !important;
+  border-radius: 8px !important;
+  background: linear-gradient(90deg, #e2ecea 0%, #cbdadb 50%, #e2ecea 100%) !important;
+  background-size: 200% 100% !important;
+  animation: skeleton-loading 1.2s infinite linear !important;
+  z-index: 10 !important;
+  display: block !important;
 }
 
 .qrcode-container.loading img,
 .qrcode-container.loading canvas {
-  opacity: 0;
+  opacity: 0 !important;
 }
 
 .qrcode-container img,
