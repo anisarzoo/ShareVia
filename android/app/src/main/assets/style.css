@@ -2,6 +2,7 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -21,6 +22,7 @@ body {
   overflow-x: hidden;
   touch-action: pan-y;
   padding-top: var(--safe-top);
+  -webkit-overflow-scrolling: touch;
 }
 
 html {
@@ -391,6 +393,8 @@ h3 {
   gap: 8px;
   max-height: 220px;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
 }
 
 .nearby-empty {
@@ -680,6 +684,8 @@ body.web-join-mode footer {
   gap: 8px;
   max-height: 220px;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px; /* Give space for the scrollbar */
 }
 
 .history-empty {
@@ -967,8 +973,10 @@ body.web-join-mode footer {
   display: grid;
   gap: 6px;
   max-height: 220px;
-  overflow: auto;
-  scrollbar-gutter: stable;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+
 }
 
 .activity-log li {
@@ -1110,6 +1118,7 @@ footer {
   .nearby-device-list,
   .history-list {
     max-height: 170px;
+    padding-right: 2px;
   }
 
   h2 {
