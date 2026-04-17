@@ -740,6 +740,57 @@ function pushReceivedArchiveItem(name, blob, timestamp) {
   updateSaveAllButtonState();
 }
 
+async function copyBlobToClipboard(blob) {
+  if (!blob) return;
+
+  // Handle Text
+  if (blob.type.startsWith('text/')) {
+    const text = await blob.text();
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  // Handle Images (Convert to PNG if needed for browser compatibility)
+  if (blob.type.startsWith('image/')) {
+    let targetBlob = blob;
+    if (blob.type !== 'image/png') {
+      targetBlob = await blobToPng(blob);
+    }
+    const data = [new ClipboardItem({ 'image/png': targetBlob })];
+    await navigator.clipboard.write(data);
+    return;
+  }
+
+  // Fallback for other types
+  const data = [new ClipboardItem({ [blob.type]: blob })];
+  await navigator.clipboard.write(data);
+}
+
+async function blobToPng(blob) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((result) => {
+        if (result) resolve(result);
+        else reject(new Error('Canvas toBlob failed'));
+      }, 'image/png');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Image load failed for conversion'));
+    };
+    img.src = url;
+  });
+}
+
 function updateSaveAllButtonState() {
   if (!elements.btnSaveAll) return;
   const count = state.receivedArchiveItems.length;
@@ -1545,15 +1596,7 @@ function addDownloadAction(id, url, fileName) {
     try {
       const resp = await fetch(url);
       const blob = await resp.blob();
-      
-      // Handle text vs binary
-      if (blob.type.startsWith('text/')) {
-        const text = await blob.text();
-        await navigator.clipboard.writeText(text);
-      } else {
-        const data = [new ClipboardItem({ [blob.type]: blob })];
-        await navigator.clipboard.write(data);
-      }
+      await copyBlobToClipboard(blob);
       
       const original = copyBtn.textContent;
       copyBtn.textContent = 'Copied!';
