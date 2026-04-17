@@ -1046,24 +1046,26 @@ body.web-join-mode footer {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  z-index: 1;
+  gap: 16px;
+  z-index: 10;
+  background: #07201e;
 }
 
 .skeleton-viewer {
-  width: 140px;
-  height: 140px;
-  border: 2px dashed rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
-  background: linear-gradient(90deg, rgba(22, 159, 144, 0.04) 25%, rgba(22, 159, 144, 0.12) 50%, rgba(22, 159, 144, 0.04) 75%);
+  width: 160px;
+  height: 160px;
+  border: 3px dashed rgba(22, 159, 144, 0.3);
+  border-radius: 24px;
+  background: linear-gradient(90deg, rgba(22, 159, 144, 0.08) 25%, rgba(22, 159, 144, 0.2) 50%, rgba(22, 159, 144, 0.08) 75%);
   background-size: 200% 100%;
   animation: skeleton-loading 1.5s infinite linear;
 }
 
 .qr-skeleton span {
-  color: var(--text-soft);
-  font-size: 0.82rem;
-  font-weight: 700;
+  color: #f4fffc;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 footer {
