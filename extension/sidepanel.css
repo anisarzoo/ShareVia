@@ -11,8 +11,9 @@
 html, body {
   height: 100%;
   width: 100%;
-  overflow: hidden;
+  overflow: clip;
   touch-action: pan-y;
+  contain: paint;
 }
 
 body {
@@ -33,19 +34,19 @@ body {
 }
 
 .orb-one {
-  width: 220px;
-  height: 220px;
-  background: radial-gradient(circle at 30% 30%, rgba(22, 159, 144, 0.25), transparent);
-  top: -80px;
-  left: -60px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle at 30% 30%, rgba(22, 159, 144, 0.2), transparent);
+  top: -60px;
+  left: -40px;
 }
 
 .orb-two {
-  width: 280px;
-  height: 280px;
-  background: radial-gradient(circle at 60% 40%, rgba(244, 136, 66, 0.18), transparent);
-  right: -100px;
-  bottom: -100px;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle at 60% 40%, rgba(244, 136, 66, 0.15), transparent);
+  right: -60px;
+  bottom: -60px;
 }
 
 /* ---- Scrollbar ---- */
