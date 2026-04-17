@@ -1960,6 +1960,9 @@ function queueNote() {
 }
 
 function generateQRCode(roomId) {
+  if (!elements.qrcodeContainer) return;
+  
+  elements.qrcodeContainer.classList.add('loading');
   elements.qrcodeContainer.innerHTML = '';
 
   const joinUrl = generateJoinUrl(roomId);
@@ -1971,6 +1974,22 @@ function generateQRCode(roomId) {
     colorLight: '#ffffff',
     correctLevel: QRCode.CorrectLevel.M,
   });
+
+  // QRCode lib usually renders synchronously but populating the img src might take a tick
+  // We check for the img and remove loading when it's ready
+  const checkImgReady = setInterval(() => {
+    const img = elements.qrcodeContainer.querySelector('img');
+    if (img && img.src && img.src !== 'undefined') {
+      elements.qrcodeContainer.classList.remove('loading');
+      clearInterval(checkImgReady);
+    }
+  }, 50);
+
+  // Safety timeout
+  setTimeout(() => {
+    elements.qrcodeContainer.classList.remove('loading');
+    clearInterval(checkImgReady);
+  }, 2000);
 }
 
 function extractRoomId(rawText) {
