@@ -98,7 +98,6 @@ const elements = {
   btnPickFolder: document.getElementById('btn-pick-folder'),
   noteInbox: document.getElementById('note-inbox'),
   textNote: document.getElementById('text-note'),
-  activityLog: document.getElementById('activity-log'),
   scannerModal: document.getElementById('scanner-modal'),
   advancedPanel: document.getElementById('advanced-panel'),
   signalHost: document.getElementById('signal-host'),
@@ -434,16 +433,7 @@ function nowLabel() {
 }
 
 function logActivity(message, source = 'System') {
-  const line = document.createElement('li');
-  const prefix = document.createElement('span');
-  prefix.textContent = `${source} ${nowLabel()}`;
-  line.appendChild(prefix);
-  line.append(` ${message}`);
-  elements.activityLog.prepend(line);
-
-  while (elements.activityLog.children.length > 120) {
-    elements.activityLog.removeChild(elements.activityLog.lastChild);
-  }
+  console.log(`[${source}] ${message}`);
 }
 
 function formatBytes(bytes) {

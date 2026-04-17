@@ -638,7 +638,6 @@ body.web-join-mode #btn-advanced,
 body.web-join-mode #advanced-panel,
 body.web-join-mode #technical-capabilities,
 body.web-join-mode #hosting-section,
-body.web-join-mode .activity-panel,
 body.web-join-mode footer {
   display: none !important;
 }
@@ -1000,34 +999,6 @@ body.web-join-mode footer {
   white-space: nowrap;
 }
 
-.activity-log {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-  max-height: 220px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 4px;
-
-}
-
-.activity-log li {
-  border-radius: 10px;
-  padding: 9px 10px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(7, 69, 63, 0.1);
-  color: var(--text-soft);
-  font-size: 0.84rem;
-}
-
-.activity-log span {
-  color: var(--text-main);
-  font-weight: 800;
-  margin-right: 6px;
-}
-
 .modal {
   position: fixed;
   inset: 0;
@@ -1219,15 +1190,6 @@ footer {
 
   .note-box textarea {
     font-size: 0.86rem;
-  }
-
-  .activity-log {
-    max-height: 160px;
-  }
-
-  .activity-log li {
-    font-size: 0.78rem;
-    padding: 8px;
   }
 }
 
