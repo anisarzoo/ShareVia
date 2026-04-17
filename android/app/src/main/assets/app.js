@@ -799,62 +799,8 @@ window.handleNativeBridgeMessage = function handleNativeBridgeMessage(payload) {
     return;
   }
 
-  if (data.type === 'pairing-code' && data.code) {
-    const code = String(data.code).trim();
-    if (!elements.joinIdInput.value.trim()) {
-      elements.joinIdInput.value = code;
-    }
-    upsertNearbyDevice({
-      code,
-      source: data.source || 'native',
-      deviceName: data.deviceName || '',
-      deviceId: data.deviceId || '',
-    });
-    setRadarStatus(state.dashboardMode === 'send'
-      ? 'Nearby device detected. Ask receiver to tap your device, or use QR/code.'
-      : 'Nearby device discovered. Tap Connect.');
-    logActivity(`Native pairing code discovered: ${code}`);
-    return;
-  }
-
-  if (data.type === 'location-room-hint' && data.code) {
-    const code = String(data.code).trim();
-    if (!elements.joinIdInput.value.trim()) {
-      elements.joinIdInput.value = code;
-    }
-    upsertNearbyDevice({
-      code,
-      source: data.source || 'location',
-      deviceName: data.deviceName || 'Location hint',
-      deviceId: data.deviceId || '',
-    });
-    setRadarStatus('Location/Wi-Fi hint received.');
-    logActivity('Location-assisted room suggestion received.');
-    return;
-  }
-
-  if (data.type === 'nearby-device' && data.code) {
-    upsertNearbyDevice(data);
-    setRadarStatus(state.dashboardMode === 'send'
-      ? 'Nearby device detected. Ask receiver to tap your device, or use QR/code.'
-      : 'Nearby device discovered. Tap Connect.');
-    return;
-  }
-
   if (data.type === 'native-capabilities') {
-    applyNativeCapabilities(data);
-    return;
-  }
-
-  if (data.type === 'permissions-requested') {
-    logActivity(`Native permissions requested for ${data.reason || 'transfer'}.`);
-    return;
-  }
-
-  if (data.type === 'permissions-denied') {
-    const denied = String(data.permissions || '').trim();
-    logActivity(`Permissions denied${denied ? `: ${denied}` : ''}.`, 'Warning');
-    setRadarStatus('Some permissions are denied. Enable Bluetooth/Wi-Fi/Location for full Offline Radar.');
+    // Platform detection logic already handles this globally
     return;
   }
 
@@ -862,6 +808,7 @@ window.handleNativeBridgeMessage = function handleNativeBridgeMessage(payload) {
     logActivity(data.message);
   }
 };
+
 
 function safeSendToConnection(connection, payload, options = {}) {
   if (!connection || !connection.open) {
@@ -2107,9 +2054,6 @@ function handleScanResult(decodedText) {
   if (elements.webJoinIdInput) {
     elements.webJoinIdInput.value = roomId;
   }
-  if (elements.joinIdInput) {
-    elements.joinIdInput.value = roomId;
-  }
   joinRoom(roomId);
 }
 
@@ -2139,12 +2083,12 @@ function bindEvents() {
   elements.btnWebJoin && elements.btnWebJoin.addEventListener('click', () => joinRoom(elements.webJoinIdInput.value));
   elements.btnWebScan && elements.btnWebScan.addEventListener('click', startScanner);
 
+  const btnCancelHost = document.getElementById('btn-cancel-host');
+  if (btnCancelHost) btnCancelHost.addEventListener('click', () => resetToSetup({ destroyPeer: true }));
 
-  elements.btnScan && elements.btnScan.addEventListener('click', startScanner);
-  document.getElementById('btn-close-scanner').addEventListener('click', stopScanner);
-  document.getElementById('btn-cancel-host').addEventListener('click', () => resetToSetup({ destroyPeer: true }));
-  document.getElementById('btn-join').addEventListener('click', () => joinRoom(elements.joinIdInput.value));
-  document.getElementById('btn-disconnect').addEventListener('click', () => resetToSetup({ destroyPeer: true }));
+  const btnDisconnect = document.getElementById('btn-disconnect');
+  if (btnDisconnect) btnDisconnect.addEventListener('click', () => resetToSetup({ destroyPeer: true }));
+
   document.getElementById('btn-advanced').addEventListener('click', toggleAdvancedPanel);
   elements.formSettings.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -2172,13 +2116,6 @@ function bindEvents() {
     });
   });
 
-  elements.joinIdInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      joinRoom(elements.joinIdInput.value);
-    }
-  });
-
   elements.webJoinIdInput && elements.webJoinIdInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -2192,6 +2129,7 @@ function bindEvents() {
       queueNote();
     }
   });
+
 
   elements.btnPickFiles.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -2272,10 +2210,8 @@ function initialize() {
     if (elements.webJoinIdInput) {
       elements.webJoinIdInput.value = roomIdFromUrl;
     }
-    if (elements.joinIdInput) {
-      elements.joinIdInput.value = roomIdFromUrl;
-    }
     joinRoom(roomIdFromUrl);
+
   }
 }
 
