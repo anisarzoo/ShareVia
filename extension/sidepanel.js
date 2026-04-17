@@ -46,10 +46,67 @@ const incomingTransfers = new Map();
 const outgoingTransfers = new Map();
 let isResetting = false;
 
+// ZIP Engine
+const JSZIP_CDN_URL = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+let jsZipLoadPromise = null;
+
 // --- Helpers ---
 
 function generateRoomCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function formatFileTimestamp(ts = Date.now()) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}${(d.getMonth() + 1).toString().padStart(2, '0')}${d.getDate().toString().padStart(2, '0')}-${d.getHours().toString().padStart(2, '0')}${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+function sanitizeArchivePath(path, fallbackName) {
+  if (!path) return fallbackName || 'file';
+  return path.split(/[\\/]/).filter(p => p && p !== '..').join('/');
+}
+
+async function getJsZipCtor() {
+  if (window.JSZip) return window.JSZip;
+  if (!jsZipLoadPromise) {
+    jsZipLoadPromise = new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = JSZIP_CDN_URL;
+      script.async = true;
+      script.onload = () => resolve(window.JSZip || null);
+      script.onerror = () => resolve(null);
+      document.head.appendChild(script);
+      setTimeout(() => resolve(window.JSZip || null), 4000);
+    });
+  }
+  const loaded = await jsZipLoadPromise;
+  if (loaded) return loaded;
+  alert('ZIP engine unavailable. Bundle transfer disabled.');
+  return null;
+}
+
+function deriveFolderArchiveName(fileEntries) {
+  const firstPath = String(fileEntries[0] && fileEntries[0].relativePath ? fileEntries[0].relativePath : '');
+  const topLevel = firstPath.split('/').filter(Boolean)[0];
+  return (topLevel || 'folder').replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+async function zipFileEntries(fileEntries) {
+  const JSZipCtor = await getJsZipCtor();
+  if (!JSZipCtor) return null;
+  const zip = new JSZipCtor();
+  for (const entry of fileEntries) {
+    const archivePath = sanitizeArchivePath(entry.relativePath || entry.file.name, entry.file.name);
+    zip.file(archivePath, entry.file);
+  }
+  const archiveBlob = await zip.generateAsync({
+    type: 'blob',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 6 },
+  });
+  const base = deriveFolderArchiveName(fileEntries);
+  const archiveName = `${base}-${formatFileTimestamp()}.zip`;
+  return new File([archiveBlob], archiveName, { type: 'application/zip' });
 }
 
 function formatBytes(bytes) {
@@ -966,6 +1023,8 @@ async function handleFiles(files, items) {
     return;
   }
 
+  const fileEntries = [];
+
   if (items && items.length > 0) {
     const allFiles = [];
     for (const item of items) {
@@ -974,17 +1033,32 @@ async function handleFiles(files, items) {
         await getFilesFromEntry(entry, allFiles);
       }
     }
-    if (allFiles.length > 0) {
-      for (const f of allFiles) {
-        await sendFile(f);
-      }
+    // Convert to entries with relative paths
+    for (const f of allFiles) {
+      fileEntries.push({ file: f, relativePath: f.webkitRelativePath || f.name });
+    }
+  } else {
+    for (const file of Array.from(files)) {
+      if (file.size === 0 && !file.type) continue;
+      fileEntries.push({ file, relativePath: file.webkitRelativePath || file.name });
+    }
+  }
+
+  if (fileEntries.length === 0) return;
+
+  const isMultiple = fileEntries.length > 1;
+  const hasFolder = fileEntries.some(e => e.relativePath && e.relativePath.includes('/'));
+
+  if (isMultiple || hasFolder) {
+    const zipped = await zipFileEntries(fileEntries);
+    if (zipped) {
+      await sendFile(zipped);
       return;
     }
   }
 
-  for (const file of Array.from(files)) {
-    if (file.size === 0 && !file.type) continue;
-    await sendFile(file);
+  for (const entry of fileEntries) {
+    await sendFile(entry.file);
   }
 }
 

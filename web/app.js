@@ -2188,14 +2188,15 @@ async function sendSelectedFiles(fileList, items, options = {}) {
     return;
   }
 
+  const isMultiple = fileEntries.length > 1;
   const hasFolderShape =
     options.source === 'folder' ||
     fileEntries.some((entry) => String(entry.relativePath || '').includes('/'));
 
-  if (hasFolderShape) {
+  if (hasFolderShape || isMultiple) {
     const zipped = await zipFileEntries(fileEntries);
     if (zipped) {
-      logActivity(`Folder bundled as ${zipped.name} (${fileEntries.length} files).`);
+      logActivity(`${hasFolderShape ? 'Folder' : 'Multiple files'} bundled as ${zipped.name} (${fileEntries.length} items).`);
       await sendFile(zipped, { bundledFromFolder: true });
       return;
     }
