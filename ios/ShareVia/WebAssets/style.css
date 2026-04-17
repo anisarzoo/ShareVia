@@ -64,6 +64,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   padding: 14px 20px;
@@ -73,6 +75,7 @@ body {
 }
 
 #btn-header-disconnect {
+  flex-shrink: 0;
   font-size: 0.8rem;
   padding: 8px 14px;
   height: auto;

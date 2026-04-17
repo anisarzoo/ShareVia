@@ -87,6 +87,7 @@ html {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 16px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
@@ -100,6 +101,7 @@ html {
 }
 
 #btn-header-disconnect {
+  flex-shrink: 0;
   font-size: 0.8rem;
   padding: 8px 14px;
   height: auto;
