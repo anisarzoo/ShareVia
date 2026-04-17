@@ -434,7 +434,6 @@ function nowLabel() {
 }
 
 function logActivity(message, source = 'System') {
-  console.log(`[${source}] ${message}`);
 }
 
 function formatBytes(bytes) {
@@ -2208,7 +2207,7 @@ function initialize() {
   configurePlatformMode();
 
   applyConfigToUI();
-  syncIceConfigFromV2();
+  // syncIceConfigFromV2();
   updateTransportBadge();
   updateStatus('Disconnected', 'disconnected');
 
@@ -2279,7 +2278,7 @@ function setupSidebarEvents() {
     state.profileName = name;
     localStorage.setItem('sv_profile_name', name);
     alert('Profile saved successfully!');
-    elements.btnSaveProfile.textContent = "Saved ?";
+    elements.btnSaveProfile.textContent = "Saved";
     setTimeout(() => { elements.btnSaveProfile.textContent = "Save"; }, 2000);
   });
   
