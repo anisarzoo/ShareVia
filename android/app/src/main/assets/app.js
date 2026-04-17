@@ -58,9 +58,7 @@ const state = {
   lastRoomId: null,
   lastJoinRoomId: null,
   dashboardMode: 'idle',
-  radarActive: false,
-  radarScanStartedAt: 0,
-  nearbyDevices: new Map(),
+
   nativeCapabilities: null,
   transferHistory: loadTransferHistory(),
   historyFilter: 'all',
@@ -1131,7 +1129,7 @@ function hostRoom() {
   state.lastJoinRoomId = null;
   state.wasHosting = true;
   state.lastRoomId = roomId;
-  stopOfflineRadarDiscovery();
+
   showSection(elements.hostingSection);
   updateStatus('Creating room', 'waiting');
   logActivity(`Creating room ${roomId}.`);
@@ -1368,11 +1366,11 @@ function resetToSetup(options = {}) {
 
   try {
     state.dashboardMode = 'idle';
-    state.radarActive = false;
     state.wasHosting = false;
     state.lastRoomId = null;
     state.lastJoinRoomId = null;
-    setElementHidden(elements.radarPanel, true);
+
+
 
     // Re-show join panel
     setElementHidden(elements.webJoinPanel, false);
