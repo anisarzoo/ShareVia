@@ -1788,11 +1788,16 @@ function addDownloadAction(id, url, fileName) {
   const item = document.getElementById(`transfer-${id}`);
   if (!item || item.querySelector('[data-download]')) return;
 
+  const headRight = item.querySelector('.transfer-head-right');
+  if (!headRight) return;
+
   const button = document.createElement('button');
   button.className = 'btn btn-secondary';
   button.dataset.download = '1';
-  button.style.marginTop = '10px';
-  button.textContent = 'Save File';
+  button.style.fontSize = '0.72rem';
+  button.style.padding = '4px 8px';
+  button.style.height = 'auto';
+  button.textContent = 'Save';
 
   button.addEventListener('click', () => {
     const anchor = document.createElement('a');
@@ -1801,7 +1806,8 @@ function addDownloadAction(id, url, fileName) {
     anchor.click();
   });
 
-  item.appendChild(button);
+  // Prepend to the right actions group (usually before the delete/cancel X)
+  headRight.prepend(button);
 }
 
 function handleIncomingData(payload, fromPeerId = '') {
