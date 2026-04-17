@@ -767,12 +767,29 @@ function applyNativeCapabilities(data) {
   }
 }
 
-function copyText(text, label) {
+function copyText(text, label, btnElement = null) {
   if (!text) return;
+
+  const provideFeedback = () => {
+    logActivity(`${label} copied to clipboard.`);
+    if (btnElement) {
+      const originalText = btnElement.textContent;
+      const isButton = btnElement.tagName === 'BUTTON';
+      
+      if (isButton) {
+        btnElement.textContent = 'Copied!';
+        btnElement.classList.add('copy-success');
+        setTimeout(() => {
+          btnElement.textContent = originalText;
+          btnElement.classList.remove('copy-success');
+        }, 1500);
+      }
+    }
+  };
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
-      logActivity(`${label} copied to clipboard.`);
+      provideFeedback();
     }).catch((error) => {
       console.warn('Clipboard write failed', error);
       logActivity(`Could not copy ${label.toLowerCase()} automatically.`, 'Warning');
@@ -786,8 +803,9 @@ function copyText(text, label) {
   input.select();
   try {
     document.execCommand('copy');
-    logActivity(`${label} copied to clipboard.`);
+    provideFeedback();
   } catch (error) {
+    console.warn('ExecCommand copy failed', error);
     logActivity(`Could not copy ${label.toLowerCase()} automatically.`, 'Warning');
   }
   document.body.removeChild(input);
@@ -1541,7 +1559,7 @@ function shareOnlineLink() {
     return;
   }
 
-  copyText(link, 'Join link');
+  copyText(link, 'Join link', elements.btnShareOnlineLink);
 }
 
 function joinRoom(inputRoomId) {
@@ -2534,12 +2552,12 @@ function bindEvents() {
   elements.btnNativeNfc && elements.btnNativeNfc.addEventListener('click', () => invokeNativeAction('startNfcPairing'));
   elements.btnNativeLocation && elements.btnNativeLocation.addEventListener('click', () => invokeNativeAction('startLocationPairing'));
 
-  document.getElementById('btn-copy-code').addEventListener('click', () => {
-    copyText(state.myId, 'Room code');
+  document.getElementById('btn-copy-code').addEventListener('click', (e) => {
+    copyText(state.myId, 'Room code', e.currentTarget);
   });
 
-  document.getElementById('btn-copy-link').addEventListener('click', () => {
-    copyText(generateJoinUrl(state.myId), 'Join link');
+  document.getElementById('btn-copy-link').addEventListener('click', (e) => {
+    copyText(generateJoinUrl(state.myId), 'Join link', e.currentTarget);
   });
 
   elements.btnSaveAll && elements.btnSaveAll.addEventListener('click', saveAllReceivedArchive);
@@ -2736,8 +2754,8 @@ function setupSidebarEvents() {
     elements.dashboardGrid.classList.remove('hidden');
   });
   
-  elements.btnCopyPcUrl.addEventListener('click', () => {
-    copyText(elements.pcServerUrl.value, "PC Server URL");
+  elements.btnCopyPcUrl.addEventListener('click', (e) => {
+    copyText(elements.pcServerUrl.value, "PC Server URL", e.currentTarget);
   });
 }
 

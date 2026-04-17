@@ -868,8 +868,13 @@ document.getElementById('btn-copy-id').addEventListener('click', () => {
   if (code && code !== '------') {
     navigator.clipboard.writeText(code).then(() => {
       const btn = document.getElementById('btn-copy-id');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<span style="font-size: 10px; font-weight: 800;">Copied!</span>';
       btn.style.background = 'rgba(13, 140, 87, 0.2)';
-      setTimeout(() => { btn.style.background = ''; }, 800);
+      setTimeout(() => { 
+        btn.innerHTML = originalHtml;
+        btn.style.background = ''; 
+      }, 1500);
     });
   }
 });
@@ -880,8 +885,13 @@ document.getElementById('btn-copy-link').addEventListener('click', () => {
     const joinUrl = `${WEB_APP_URL}/#${code}`;
     navigator.clipboard.writeText(joinUrl).then(() => {
       const btn = document.getElementById('btn-copy-link');
+      const originalText = btn.textContent;
+      btn.textContent = 'Copied!';
       btn.style.background = 'rgba(13, 140, 87, 0.2)';
-      setTimeout(() => { btn.style.background = ''; }, 800);
+      setTimeout(() => { 
+        btn.textContent = originalText;
+        btn.style.background = ''; 
+      }, 1500);
     });
   }
 });

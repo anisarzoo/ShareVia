@@ -603,6 +603,12 @@ textarea {
   border-color: rgba(200, 67, 52, 0.2);
 }
 
+.copy-success {
+  background: var(--success) !important;
+  color: #fff !important;
+  border-color: var(--success) !important;
+}
+
 .native-actions {
   margin-top: 10px;
   display: flex;
