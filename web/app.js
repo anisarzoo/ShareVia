@@ -1525,11 +1525,26 @@ function markTransferCancelled(id) {
   const status = document.getElementById(`status-${id}`);
   const speed = document.getElementById(`speed-${id}`);
   const cancelBtn = document.getElementById(`cancel-${id}`);
+  const item = document.getElementById(`transfer-${id}`);
 
-  if (bar) { bar.style.background = 'var(--danger, #c84334)'; bar.style.width = '100%'; }
+  if (bar) { 
+    bar.style.background = 'var(--danger, #c84334)'; 
+    bar.style.width = '100%'; 
+    bar.classList.remove('complete');
+  }
   if (status) status.textContent = 'Cancelled';
   if (speed) speed.textContent = '-';
   if (cancelBtn) cancelBtn.remove();
+  
+  // Clean up Copy/Save buttons if they exist
+  if (item) {
+    const actions = item.querySelector('.transfer-actions');
+    if (actions) actions.remove();
+  }
+
+  // Remove from archive list if it was there
+  state.receivedArchiveItems = state.receivedArchiveItems.filter(i => i.id !== id);
+  updateSaveAllButtonState();
 }
 
 function updateTransferProgress(id, progress, transferredBytes, totalBytes, startTs, statusLabel) {
