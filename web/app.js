@@ -756,57 +756,6 @@ function pushReceivedArchiveItem(name, blob, timestamp) {
   updateSaveAllButtonState();
 }
 
-async function copyBlobToClipboard(blob) {
-  if (!blob) return;
-
-  // Handle Text
-  if (blob.type.startsWith('text/')) {
-    const text = await blob.text();
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  // Handle Images (Convert to PNG if needed for browser compatibility)
-  if (blob.type.startsWith('image/')) {
-    let targetBlob = blob;
-    if (blob.type !== 'image/png') {
-      targetBlob = await blobToPng(blob);
-    }
-    const data = [new ClipboardItem({ 'image/png': targetBlob })];
-    await navigator.clipboard.write(data);
-    return;
-  }
-
-  // Fallback for other types
-  const data = [new ClipboardItem({ [blob.type]: blob })];
-  await navigator.clipboard.write(data);
-}
-
-async function blobToPng(blob) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(blob);
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
-      canvas.toBlob((result) => {
-        if (result) resolve(result);
-        else reject(new Error('Canvas toBlob failed'));
-      }, 'image/png');
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Image load failed for conversion'));
-    };
-    img.src = url;
-  });
-}
-
 function updateSaveAllButtonState() {
   if (!elements.btnSaveAll) return;
   const count = state.receivedArchiveItems.length;
@@ -1445,6 +1394,14 @@ function createTransferUI(id, name, size, direction, timestamp = Date.now()) {
   const head = document.createElement('div');
   head.className = 'transfer-head';
 
+  // Preview container for completed files
+  const previewThumb = document.createElement('div');
+  previewThumb.className = 'transfer-preview-thumb';
+  head.appendChild(previewThumb);
+
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'transfer-title-wrap';
+
   const title = document.createElement('span');
   title.className = 'transfer-name';
   
@@ -1454,6 +1411,7 @@ function createTransferUI(id, name, size, direction, timestamp = Date.now()) {
   
   title.appendChild(icon);
   title.appendChild(document.createTextNode(name));
+  titleWrap.appendChild(title);
 
   const headRight = document.createElement('div');
   headRight.className = 'transfer-head-right';
@@ -1472,7 +1430,7 @@ function createTransferUI(id, name, size, direction, timestamp = Date.now()) {
   headRight.appendChild(sizeLabel);
   headRight.appendChild(cancelBtn);
 
-  head.appendChild(title);
+  head.appendChild(titleWrap);
   head.appendChild(headRight);
 
   const progressWrap = document.createElement('div');
@@ -1602,6 +1560,91 @@ function addDownloadAction(id, url, fileName) {
   const headRight = item.querySelector('.transfer-head-right');
   if (!headRight) return;
 
+  const record = state.incomingTransfers.get(id) || 
+                 state.receivedArchiveItems.find(i => i.id === id); 
+
+  // Make the whole card clickable for preview
+  item.classList.add('completed');
+  item.style.cursor = 'pointer';
+  item.title = 'Click to preview / open';
+  item.addEventListener('click', (e) => {
+    // Don't trigger if clicking buttons specifically
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    window.open(url, '_blank');
+  });
+
+  // Handle Right-Click & Native Features
+  if (record && record.mime && record.mime.startsWith('image/')) {
+    // 1. Visible Thumbnail for Images
+    const thumbContainer = item.querySelector('.transfer-preview-thumb');
+    if (thumbContainer) {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'Preview';
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'cover';
+      thumbContainer.appendChild(img);
+    }
+
+    // 2. Transparent Overlay for whole-card Right-Click "Copy Image"
+    const nativeLayer = document.createElement('img');
+    nativeLayer.src = url;
+    nativeLayer.className = 'native-copy-overlay';
+    nativeLayer.style.position = 'absolute';
+    nativeLayer.style.inset = '0';
+    nativeLayer.style.width = '100%';
+    nativeLayer.style.height = '100%';
+    nativeLayer.style.opacity = '0.01';
+    nativeLayer.style.zIndex = '1';
+    nativeLayer.style.pointerEvents = 'auto';
+    item.style.position = 'relative';
+    item.appendChild(nativeLayer);
+  } else {
+    // Handle Previews/Icons for other formats
+    const thumbContainer = item.querySelector('.transfer-preview-thumb');
+    if (thumbContainer) {
+      const iconSpan = document.createElement('span');
+      iconSpan.style.fontSize = '1.2rem';
+      
+      const mime = (record && record.mime) || '';
+      if (mime.startsWith('audio/')) {
+        iconSpan.textContent = '🎵';
+      } else if (mime.startsWith('video/')) {
+        // Video Thumbnail: Use a video element at the 1-second mark
+        const videoThumb = document.createElement('video');
+        videoThumb.src = `${url}#t=1`; // Show frame at 1s
+        videoThumb.muted = true;
+        videoThumb.playsInline = true;
+        videoThumb.style.width = '100%';
+        videoThumb.style.height = '100%';
+        videoThumb.style.objectFit = 'cover';
+        thumbContainer.appendChild(videoThumb);
+        return; // Skip the iconSpan append
+      } else if (mime.includes('zip') || mime.includes('archive')) {
+        iconSpan.textContent = '📦';
+      } else if (mime.startsWith('text/') || mime.includes('pdf')) {
+        iconSpan.textContent = '📄';
+      } else {
+        iconSpan.textContent = '📁';
+      }
+      thumbContainer.appendChild(iconSpan);
+    }
+
+    // 2. Transparent Link Overlay for non-images (enables "Copy link address" menu)
+    const linkLayer = document.createElement('a');
+    linkLayer.href = url;
+    linkLayer.download = record.name;
+    linkLayer.style.position = 'absolute';
+    linkLayer.style.inset = '0';
+    linkLayer.style.width = '100%';
+    linkLayer.style.height = '100%';
+    linkLayer.style.zIndex = '1';
+    linkLayer.style.cursor = 'pointer';
+    item.style.position = 'relative';
+    item.appendChild(linkLayer);
+  }
+
   const buttonGroup = document.createElement('div');
   buttonGroup.className = 'transfer-actions';
   buttonGroup.style.display = 'flex';
@@ -1615,38 +1658,14 @@ function addDownloadAction(id, url, fileName) {
   saveBtn.style.padding = '4px 8px';
   saveBtn.style.height = 'auto';
   saveBtn.textContent = 'Save';
-  saveBtn.addEventListener('click', () => {
+  saveBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent card click
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = fileName;
     anchor.click();
   });
 
-  // Copy Button
-  const copyBtn = document.createElement('button');
-  copyBtn.className = 'btn btn-secondary';
-  copyBtn.style.fontSize = '0.72rem';
-  copyBtn.style.padding = '4px 8px';
-  copyBtn.style.height = 'auto';
-  copyBtn.textContent = 'Copy';
-  copyBtn.addEventListener('click', async () => {
-    try {
-      const resp = await fetch(url);
-      const blob = await resp.blob();
-      await copyBlobToClipboard(blob);
-      
-      const original = copyBtn.textContent;
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => { copyBtn.textContent = original; }, 1500);
-    } catch (err) {
-      console.warn('Copy failed:', err);
-      logActivity('Direct copy not supported for this file type.', 'Warning');
-      copyBtn.textContent = 'Error';
-      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
-    }
-  });
-
-  buttonGroup.appendChild(copyBtn);
   buttonGroup.appendChild(saveBtn);
 
   // Prepend to the right actions group
