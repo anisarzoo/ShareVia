@@ -111,6 +111,7 @@ const elements = {
   formSettings: document.getElementById('form-settings'),
   btnHeaderDisconnect: document.getElementById('btn-header-disconnect'),
   qrSkeleton: document.getElementById('qr-skeleton'),
+  transfersPanel: document.getElementById('transfers-panel'),
 };
 
 let initializeDone = false;
@@ -428,8 +429,14 @@ function showSection(section) {
   section.classList.add('active');
 
   // Update history visibility: hide if only on setup, show once starting/joining room
-  // Update history visibility: unnecessary as history panel is removed
-  // elements.historyPanel is null now
+  // Update transfers panel visibility: show alongside share section or hosting
+  if (elements.transfersPanel) {
+    if (section === elements.setupSection) {
+      elements.transfersPanel.classList.add('hidden');
+    } else {
+      elements.transfersPanel.classList.remove('hidden');
+    }
+  }
 
   // Update header disconnect button visibility and text
   if (elements.btnHeaderDisconnect) {
