@@ -93,11 +93,15 @@ function showSection(section) {
   [elements.setupSection, elements.hostingSection, elements.shareSection].forEach(s => s.classList.add('hidden'));
   section.classList.remove('hidden');
   
-  if (section === elements.setupSection) {
+  if (section === elements.shareSection) {
+    elements.transfersPanel.classList.remove('hidden');
+  } else {
     elements.transfersPanel.classList.add('hidden');
+  }
+
+  if (section === elements.setupSection) {
     elements.btnHeaderDisconnect.classList.add('hidden');
   } else {
-    elements.transfersPanel.classList.remove('hidden');
     elements.btnHeaderDisconnect.classList.remove('hidden');
     elements.btnHeaderDisconnect.textContent = (section === elements.hostingSection) ? 'Cancel' : 'Leave';
   }

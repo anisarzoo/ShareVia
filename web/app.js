@@ -431,10 +431,10 @@ function showSection(section) {
   // Update history visibility: hide if only on setup, show once starting/joining room
   // Update transfers panel visibility: show alongside share section or hosting
   if (elements.transfersPanel) {
-    if (section === elements.setupSection) {
-      elements.transfersPanel.classList.add('hidden');
-    } else {
+    if (section === elements.shareSection) {
       elements.transfersPanel.classList.remove('hidden');
+    } else {
+      elements.transfersPanel.classList.add('hidden');
     }
   }
 
