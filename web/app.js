@@ -1994,6 +1994,7 @@ async function sendFileToPeer(connection, file, options = {}) {
     transferId,
     peerId,
     size: file.size,
+    mime: file.type || 'application/octet-stream',
     sentBytes: 0,
     ackedBytes: 0,
     startedAt,
