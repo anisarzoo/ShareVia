@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ShareVia</title>
+  <title>ShareVia - Side Panel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -18,92 +18,128 @@
       <div class="brand">
         <img src="icon128.png" alt="ShareVia" class="logo-img">
         <div>
-          <p class="eyebrow">P2P Transfer</p>
+          <p class="eyebrow">Extension Transfer</p>
           <h1>ShareVia</h1>
         </div>
       </div>
-      <span id="status-badge" class="status-badge disconnected">Disconnected</span>
+      <button id="btn-header-disconnect" class="btn btn-ghost hidden" type="button">Leave</button>
     </header>
 
-    <main>
-      <!-- Setup Screen -->
+    <main class="main-grid">
       <section id="setup-section" class="panel active">
         <h2>Start Sharing</h2>
-        <p class="subtitle">Create a room to host or enter a code to join.</p>
+        <p class="subtitle">Host a room or join one to transfer files.</p>
 
-        <div class="action-grid">
-          <button id="btn-host" class="btn btn-primary pulse">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49m-8.48-.01a6 6 0 010-8.49m11.31-2.82a10 10 0 010 14.14m-14.14 0a10 10 0 010-14.14"/></svg>
-            Create Room
+        <div id="dashboard-grid" class="dashboard-grid">
+          <button id="btn-dashboard-send" class="dashboard-card send" type="button" style="grid-column: 1 / -1; width: 100%;">
+            <div class="dashboard-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49m-8.48-.01a6 6 0 010-8.49m11.31-2.82a10 10 0 010 14.14m-14.14 0a10 10 0 010-14.14"/></svg>
+            </div>
+            <div class="dashboard-title">Create Room</div>
           </button>
         </div>
 
-        <div class="divider-line"><span>or join existing</span></div>
+        <div id="web-join-panel" class="web-join-panel">
+          <p class="subtitle">Join existing room</p>
+          <div class="join-inline">
+            <input type="text" id="web-join-id" placeholder="6-digit code" inputmode="numeric" maxlength="6">
+            <button id="btn-web-join" class="btn btn-secondary" type="button">Join</button>
+          </div>
+          <button id="btn-web-scan" class="btn btn-ghost full" type="button" style="margin-top: 8px; font-size: 0.8rem;">Scan QR</button>
+        </div>
 
-        <div class="join-inline">
-          <input type="text" id="join-id" placeholder="Enter 6-digit code" inputmode="numeric" maxlength="6">
-          <button id="btn-join" class="btn btn-secondary">Join</button>
+
+        <button id="btn-advanced" class="link-btn" type="button">Network Settings</button>
+        <div id="advanced-panel" class="advanced hidden">
+          <form id="form-settings">
+            <div class="field-grid">
+              <label class="field">
+                <span>Signal Host</span>
+                <input id="signal-host" type="text" placeholder="Default">
+              </label>
+              <label class="field">
+                <span>Port</span>
+                <input id="signal-port" type="number" placeholder="9000">
+              </label>
+              <label class="field check" style="grid-column: 1 / -1;">
+                <input id="signal-secure" type="checkbox" checked>
+                <span>Secure (TLS)</span>
+              </label>
+            </div>
+            <button id="btn-save-config" type="submit" class="btn btn-secondary full">Save Settings</button>
+          </form>
         </div>
       </section>
 
-      <!-- Hosting Screen -->
       <section id="hosting-section" class="panel hidden">
         <h2>Room Ready</h2>
-        <p class="subtitle">Share this code or scan QR to connect.</p>
         <div class="code-display">
           <span id="my-peer-id" class="large-code">------</span>
-          <button id="btn-copy-id" class="btn-icon" title="Copy Code">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-          </button>
         </div>
-        <div id="qrcode-container" class="qrcode-container" style="min-height: 160px;"></div>
-        <p class="info-text">Scan with mobile to join instantly.</p>
-        <button id="btn-copy-link" class="btn btn-secondary full" style="margin-bottom: 8px;">Copy Link</button>
-        <button id="btn-cancel-host" class="btn btn-ghost full">Cancel</button>
+        <div id="qrcode-container" class="qrcode-container"></div>
+        <div class="host-actions" style="grid-template-columns: 1fr 1fr;">
+          <button id="btn-copy-code" class="btn btn-secondary">Copy Code</button>
+          <button id="btn-copy-link" class="btn btn-secondary">Copy Link</button>
+        </div>
       </section>
 
-      <!-- Share Screen -->
       <section id="share-section" class="panel hidden">
         <div class="room-pill">
-          <span>Connected peers</span>
+          <span>Connected</span>
           <strong id="remote-peer-id">------</strong>
         </div>
 
         <div id="drop-zone" class="drop-zone">
-          <div class="drop-zone-content">
-            <svg class="drop-icon-svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <p class="drop-title">Drop files or folders</p>
-            <p class="drop-help">Or use the buttons below</p>
-            <div class="picker-group">
-              <button id="btn-pick-files" class="btn btn-secondary btn-sm" type="button">Files</button>
-              <button id="btn-pick-folder" class="btn btn-secondary btn-sm" type="button">Folder</button>
-            </div>
-            <input type="file" id="file-input" hidden multiple>
-            <input type="file" id="folder-input" hidden webkitdirectory directory multiple>
+          <p class="drop-title">Drop files here</p>
+          <div class="picker-group">
+            <button id="btn-pick-files" class="btn btn-secondary" type="button">Files</button>
+            <button id="btn-pick-folder" class="btn btn-secondary" type="button">Folder</button>
           </div>
+          <input type="file" id="file-input" hidden multiple>
+          <input type="file" id="folder-input" hidden webkitdirectory directory multiple>
         </div>
 
-        <div id="transfer-list" class="transfer-list"></div>
-
         <div class="note-box">
-          <label for="text-note">Quick message</label>
-          <textarea id="text-note" rows="2" placeholder="Send a short text note to paired device"></textarea>
+          <textarea id="text-note" rows="2" placeholder="Send a message..."></textarea>
           <button id="btn-send-note" class="btn btn-secondary full">Send Note</button>
         </div>
 
         <div id="note-inbox" class="note-inbox"></div>
+      </section>
 
-        <button id="btn-disconnect" class="btn btn-ghost full">Disconnect</button>
+      <section id="transfers-panel" class="panel hidden">
+        <div class="panel-header">
+          <h2>Transfers</h2>
+          <button id="btn-save-all" class="btn btn-secondary" type="button" disabled>Save All</button>
+        </div>
+        <div class="transfer-filters">
+          <div class="history-tabs">
+            <button class="history-tab active" data-history-tab="all" type="button">All</button>
+            <button class="history-tab" data-history-tab="received" type="button">Received</button>
+            <button class="history-tab" data-history-tab="sent" type="button">Sent</button>
+          </div>
+        </div>
+        <div id="transfer-list" class="transfer-list"></div>
       </section>
     </main>
 
+    <div id="scanner-modal" class="modal hidden">
+        <div class="modal-card">
+          <div id="qr-reader"></div>
+          <button id="btn-close-scanner" class="btn btn-ghost full" style="margin-top: 10px;">Close</button>
+        </div>
+    </div>
+
     <footer>
-      <p>Direct P2P transfer · No size limits</p>
+
+      <p>Direct P2P · No size limits</p>
     </footer>
   </div>
 
   <script src="peerjs.min.js"></script>
   <script src="qrcode.min.js"></script>
+  <script src="html5-qrcode.min.js"></script>
   <script src="sidepanel.js"></script>
 </body>
+
 </html>
