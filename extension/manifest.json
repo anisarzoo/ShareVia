@@ -1,26 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "ShareVia - High Speed Sharing",
-  "version": "1.0",
-  "description": "Share files directly between peers with no size limits and a sleek sidebar interface.",
-  "permissions": ["sidePanel"],
-  "side_panel": {
-    "default_path": "sidepanel.html"
-  },
-  "background": {
-    "service_worker": "background.js"
-  },
-  "action": {
-    "default_title": "Open ShareVia Side Panel",
-    "default_icon": {
-      "16": "icon16.png",
-      "48": "icon48.png",
-      "128": "icon128.png"
-    }
-  },
+  "name": "ShareVia",
+  "version": "1.0.0",
+  "description": "Cross-device P2P file transfer via browser extension side panel.",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open ShareVia"
   }
 }
