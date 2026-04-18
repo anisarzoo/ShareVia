@@ -161,7 +161,10 @@
       </section>
 
       <section id="transfers-panel" class="panel hidden">
-        <h2>Transfers</h2>
+        <div class="panel-header">
+          <h2>Transfers</h2>
+          <button id="btn-save-all" class="btn btn-secondary" type="button" disabled>Save All (Archive)</button>
+        </div>
         <div class="transfer-filters">
           <div class="history-tabs">
             <button class="history-tab active" data-history-tab="all" type="button">All</button>
@@ -171,9 +174,6 @@
         </div>
 
         <div id="transfer-list" class="transfer-list"></div>
-        <div class="transfer-tools">
-          <button id="btn-save-all" class="btn btn-secondary full" type="button" disabled>Save All (Archive)</button>
-        </div>
       </section>
 
 
