@@ -1528,6 +1528,9 @@ function updateTransferProgress(id, progress, transferredBytes, totalBytes, star
   const speed = document.getElementById(`speed-${id}`);
 
   if (!bar || !status || !speed) return;
+  
+  // Don't overwrite "Finished" / "Received" status once complete
+  if (bar.classList.contains('complete')) return;
 
   const clamped = Math.max(0, Math.min(progress, 100));
   bar.style.width = `${clamped.toFixed(1)}%`;
