@@ -312,14 +312,10 @@ function renderTransferHistory() {
 
     const name = document.createElement('span');
     name.className = 'history-name';
-    name.textContent = entry.name;
-
-    const type = document.createElement('span');
-    type.className = 'history-type';
-    type.textContent = entry.direction === 'received' ? 'Received' : 'Sent';
+    const action = entry.direction === 'received' ? 'received' : 'sent';
+    name.textContent = `${entry.name} ${action}`;
 
     row.appendChild(name);
-    row.appendChild(type);
 
     const meta = document.createElement('div');
     meta.className = 'history-meta';

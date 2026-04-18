@@ -701,7 +701,7 @@ body.web-join-mode footer {
 .history-name {
   font-weight: 800;
   font-size: 0.86rem;
-  max-width: 76%;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
