@@ -252,7 +252,7 @@ function finishIncomingTransfer(data, fromPeer) {
   const transfer = state.incomingTransfers.get(key);
   if (!transfer) return;
 
-  const blob = new Blob(transfer.chunks);
+  const blob = new Blob(transfer.chunks, { type: transfer.mime || 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   
   markTransferComplete(key, `Received at ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`);
