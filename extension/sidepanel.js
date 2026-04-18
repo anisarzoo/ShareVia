@@ -37,6 +37,7 @@ const elements = {
   btnWebScan: document.getElementById('btn-web-scan'),
   btnAdvanced: document.getElementById('btn-advanced'),
   advancedPanel: document.getElementById('advanced-panel'),
+  setupStatus: document.getElementById('setup-status'),
   
   myPeerId: document.getElementById('my-peer-id'),
   remotePeerId: document.getElementById('remote-peer-id'),
@@ -157,9 +158,30 @@ function initPeer(id = null) {
 
   state.peer.on('error', (err) => {
     console.error('Peer error:', err);
-    alert('Peer error: ' + err.type);
-    resetApp();
+    if (err.type === 'server-error' || err.type === 'socket-error' || err.type === 'network') {
+      showSetupStatus('Signaling server is waking up. Retrying in 5s...', 'info');
+      setTimeout(() => initPeer(id), 5000);
+    } else {
+      showSetupStatus('Peer error: ' + err.type, 'error');
+      resetApp();
+    }
   });
+}
+
+function showSetupStatus(msg, type = 'error') {
+  if (!elements.setupStatus) return;
+  elements.setupStatus.textContent = msg;
+  elements.setupStatus.className = 'status-msg ' + type;
+  elements.setupStatus.classList.remove('hidden');
+  if (type === 'info') {
+    elements.setupStatus.style.background = 'rgba(22, 159, 144, 0.1)';
+    elements.setupStatus.style.color = 'var(--brand-strong)';
+    elements.setupStatus.style.borderColor = 'rgba(22, 159, 144, 0.2)';
+  } else {
+    elements.setupStatus.style.background = 'rgba(244, 67, 54, 0.1)';
+    elements.setupStatus.style.color = '#d32f2f';
+    elements.setupStatus.style.borderColor = 'rgba(244, 67, 54, 0.2)';
+  }
 }
 
 function setupConnection(conn) {
