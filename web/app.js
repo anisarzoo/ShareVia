@@ -112,6 +112,7 @@ const elements = {
   formSettings: document.getElementById('form-settings'),
   btnHeaderDisconnect: document.getElementById('btn-header-disconnect'),
   qrSkeleton: document.getElementById('qr-skeleton'),
+  historyPanel: document.getElementById('history-panel'),
 };
 
 let initializeDone = false;
@@ -421,6 +422,15 @@ function showSection(section) {
 
   section.classList.remove('hidden');
   section.classList.add('active');
+
+  // Update history visibility: hide if only on setup, show once starting/joining room
+  if (elements.historyPanel) {
+    if (section === elements.setupSection) {
+      elements.historyPanel.classList.add('hidden');
+    } else {
+      elements.historyPanel.classList.remove('hidden');
+    }
+  }
 
   // Update header disconnect button visibility and text
   if (elements.btnHeaderDisconnect) {
