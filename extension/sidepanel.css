@@ -390,3 +390,84 @@ textarea { width: 100%; resize: none; min-height: 60px; font-family: inherit; }
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Buy Me A Coffee Styles */
+.app-footer {
+  margin-top: auto;
+  padding: 20px 10px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid rgba(0,0,0,0.04);
+}
+.footer-note {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  opacity: 0.8;
+}
+.bmc-wrap {
+  position: relative;
+  display: inline-block;
+}
+.bmc-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  background: rgba(244, 136, 66, 0.08);
+  color: #d35400;
+  border-radius: 99px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.8rem;
+  border: 1px solid rgba(244, 136, 66, 0.2);
+  transition: all 0.2s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+  position: relative;
+}
+.bmc-btn:hover {
+  background: rgba(244, 136, 66, 0.12);
+  transform: translateY(-2px);
+}
+.bmc-qr-card {
+  position: absolute;
+  bottom: 150%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  width: 160px;
+  background: #fff;
+  padding: 12px;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  z-index: 100;
+}
+.bmc-qr-card::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid #fff;
+}
+.bmc-qr-card p {
+  font-size: 0.7rem;
+  color: var(--text-soft);
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+.bmc-qr-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: block;
+}
+.bmc-btn:hover .bmc-qr-card {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
