@@ -258,7 +258,7 @@ function sanitizeArchivePath(path, fallbackName) {
   return clean || String(fallbackName || 'file.bin').trim() || 'file.bin';
 }
 
-function addTransferHistoryEntry(entry, url) {
+function addTransferHistoryEntry(entry) {
   const normalized = {
     id: createTransferId(),
     direction: entry.direction === 'received' ? 'received' : 'sent',
@@ -266,7 +266,6 @@ function addTransferHistoryEntry(entry, url) {
     size: Number(entry.size || 0),
     status: String(entry.status || 'Completed'),
     timestamp: Number(entry.timestamp || Date.now()),
-    url: url || null,
   };
 
   state.transferHistory.unshift(normalized);
@@ -324,51 +323,6 @@ function renderTransferHistory() {
 
     item.appendChild(row);
     item.appendChild(meta);
-
-    // If it's a received file from the current session, add actions
-    if (entry.direction === 'received' && entry.url) {
-      const actions = document.createElement('div');
-      actions.className = 'history-actions';
-      actions.style.display = 'flex';
-      actions.style.gap = '8px';
-      actions.style.marginTop = '8px';
-
-      const saveBtn = document.createElement('button');
-      saveBtn.className = 'btn btn-secondary';
-      saveBtn.style.fontSize = '0.7rem';
-      saveBtn.style.padding = '4px 10px';
-      saveBtn.style.height = 'auto';
-      saveBtn.textContent = 'Save';
-      saveBtn.onclick = () => {
-        const a = document.createElement('a');
-        a.href = entry.url;
-        a.download = entry.name;
-        a.click();
-      };
-
-      const copyBtn = document.createElement('button');
-      copyBtn.className = 'btn btn-secondary';
-      copyBtn.style.fontSize = '0.7rem';
-      copyBtn.style.padding = '4px 10px';
-      copyBtn.style.height = 'auto';
-      copyBtn.textContent = 'Copy';
-      copyBtn.onclick = async () => {
-        try {
-          const resp = await fetch(entry.url);
-          const blob = await resp.blob();
-          await copyBlobToClipboard(blob);
-          copyBtn.textContent = 'Copied!';
-          setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
-        } catch (err) {
-          copyBtn.textContent = 'Err';
-          setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
-        }
-      };
-
-      actions.appendChild(saveBtn);
-      actions.appendChild(copyBtn);
-      item.appendChild(actions);
-    }
     elements.historyList.appendChild(item);
   });
 }
@@ -1619,19 +1573,10 @@ function markTransferComplete(id, statusLabel) {
   const bar = document.getElementById(`progress-${id}`);
   const status = document.getElementById(`status-${id}`);
   const speed = document.getElementById(`speed-${id}`);
-  const item = document.getElementById(`transfer-${id}`);
 
   if (bar) bar.classList.add('complete');
   if (status && statusLabel) status.textContent = statusLabel;
   if (speed) speed.textContent = 'Finished';
-
-  // Automatically remove from active list since it's now in History
-  if (item) {
-    setTimeout(() => {
-      item.classList.add('fade-out');
-      setTimeout(() => item.remove(), 500);
-    }, 3000);
-  }
 }
 
 function addDownloadAction(id, url, fileName) {
@@ -1837,7 +1782,7 @@ function handleIncomingFileEnd(payload, fromPeerId = '') {
     size: record.size,
     status: 'Completed',
     timestamp: Date.now(),
-  }, url);
+  });
   state.incomingTransfers.delete(transferKey);
 }
 

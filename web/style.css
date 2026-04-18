@@ -642,29 +642,6 @@ body.web-join-mode footer {
   margin-top: 24px;
 }
 
-.history-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.history-header h2 {
-  margin: 0;
-}
-
-.history-tabs-container {
-  margin-top: 24px;
-  border-top: 1px solid rgba(7, 69, 63, 0.1);
-  padding-top: 20px;
-}
-
-.history-tabs-container h3 {
-  font-size: 1rem;
-  margin-bottom: 12px;
-  color: var(--text-muted);
-}
-
 .history-tabs {
   margin-top: 10px;
   display: grid;
@@ -1543,10 +1520,4 @@ footer {
   100% {
     background-position: -200% 0;
   }
-}
-
-.transfer-card.fade-out {
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity 0.5s ease, transform 0.5s ease;
 }
