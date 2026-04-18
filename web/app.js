@@ -90,7 +90,6 @@ const elements = {
   fileInput: document.getElementById('file-input'),
   folderInput: document.getElementById('folder-input'),
   btnSaveAll: document.getElementById('btn-save-all'),
-  historyList: document.getElementById('history-list'),
   historyTabs: Array.from(document.querySelectorAll('[data-history-tab]')),
   btnPickFiles: document.getElementById('btn-pick-files'),
   btnPickFolder: document.getElementById('btn-pick-folder'),
@@ -112,7 +111,6 @@ const elements = {
   formSettings: document.getElementById('form-settings'),
   btnHeaderDisconnect: document.getElementById('btn-header-disconnect'),
   qrSkeleton: document.getElementById('qr-skeleton'),
-  historyPanel: document.getElementById('history-panel'),
 };
 
 let initializeDone = false;
@@ -279,10 +277,20 @@ function addTransferHistoryEntry(entry) {
 function setHistoryFilter(tab) {
   const next = ['all', 'received', 'sent'].includes(tab) ? tab : 'all';
   state.historyFilter = next;
+  
   elements.historyTabs.forEach((button) => {
     button.classList.toggle('active', button.dataset.historyTab === next);
   });
-  renderTransferHistory();
+  
+  // Filter the active transfer list
+  const cards = elements.transferList.querySelectorAll('.transfer-item');
+  cards.forEach((card) => {
+    if (next === 'all') {
+      card.classList.remove('hidden');
+    } else {
+      card.classList.toggle('hidden', card.dataset.direction !== next);
+    }
+  });
 }
 
 function renderTransferHistory() {
@@ -420,13 +428,8 @@ function showSection(section) {
   section.classList.add('active');
 
   // Update history visibility: hide if only on setup, show once starting/joining room
-  if (elements.historyPanel) {
-    if (section === elements.setupSection) {
-      elements.historyPanel.classList.add('hidden');
-    } else {
-      elements.historyPanel.classList.remove('hidden');
-    }
-  }
+  // Update history visibility: unnecessary as history panel is removed
+  // elements.historyPanel is null now
 
   // Update header disconnect button visibility and text
   if (elements.btnHeaderDisconnect) {
@@ -1425,6 +1428,12 @@ function createTransferUI(id, name, size, direction, timestamp = Date.now()) {
   const wrapper = document.createElement('article');
   wrapper.id = `transfer-${id}`;
   wrapper.className = `transfer-item ${direction}`;
+  wrapper.dataset.direction = direction === 'outgoing' ? 'sent' : 'received';
+  
+  // Applied current filter if any
+  if (state.historyFilter !== 'all' && wrapper.dataset.direction !== state.historyFilter) {
+    wrapper.classList.add('hidden');
+  }
 
   const head = document.createElement('div');
   head.className = 'transfer-head';

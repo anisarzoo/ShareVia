@@ -638,8 +638,9 @@ body.web-join-mode footer {
   margin-bottom: 10px;
 }
 
-.history-panel {
-  margin-top: 24px;
+.transfer-filters {
+  margin-top: 20px;
+  padding-top: 10px;
 }
 
 .history-tabs {
@@ -650,17 +651,25 @@ body.web-join-mode footer {
 }
 
 .history-tab {
-  border: 1px solid rgba(7, 69, 63, 0.2);
-  border-radius: 10px;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(7, 69, 63, 0.1);
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.5);
   color: var(--text-main);
   font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.history-tab:hover {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .history-tab.active {
-  background: rgba(22, 159, 144, 0.18);
-  border-color: rgba(22, 159, 144, 0.36);
+  background: var(--primary-light);
+  color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .history-list {
