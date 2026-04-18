@@ -158,21 +158,28 @@
         </div>
 
         <div id="note-inbox" class="note-inbox"></div>
-        <div id="transfer-list" class="transfer-list"></div>
-        <div class="transfer-tools">
-          <button id="btn-save-all" class="btn btn-secondary full" type="button" disabled>Save All (Archive)</button>
-        </div>
       </section>
 
-      <!-- Separate History Panel -->
+      <!-- Unified History and Active Transfers Panel -->
       <section id="history-panel" class="panel history-panel hidden">
-        <h2>History</h2>
-        <div class="history-tabs">
-          <button class="history-tab active" data-history-tab="all" type="button">All</button>
-          <button class="history-tab" data-history-tab="received" type="button">Received</button>
-          <button class="history-tab" data-history-tab="sent" type="button">Sent</button>
+        <div class="history-header">
+          <h2>Transfers</h2>
+          <div class="transfer-tools">
+            <button id="btn-save-all" class="btn btn-secondary" type="button" disabled>Save All (Archive)</button>
+          </div>
         </div>
-        <ul id="history-list" class="history-list"></ul>
+        
+        <div id="transfer-list" class="transfer-list"></div>
+
+        <div class="history-tabs-container">
+          <h3>History</h3>
+          <div class="history-tabs">
+            <button class="history-tab active" data-history-tab="all" type="button">All</button>
+            <button class="history-tab" data-history-tab="received" type="button">Received</button>
+            <button class="history-tab" data-history-tab="sent" type="button">Sent</button>
+          </div>
+        </div>
+  <ul id="history-list" class="history-list"></ul>
       </section>
 
 
