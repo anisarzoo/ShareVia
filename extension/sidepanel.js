@@ -33,7 +33,7 @@ const ID_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 /** E2EE Crypto Suite **/
 async function encryptPayload(data) {
-  const secret = state.e2eeSecret;
+  const secret = String(state.e2eeSecret || '').trim();
   if (!secret || !data) return data;
   
   try {
@@ -408,7 +408,7 @@ function setupConnection(conn) {
   });
 
   conn.on('data', async (payload) => {
-    handleIncomingData(payload, conn.peer);
+    await handleIncomingData(payload, conn.peer);
   });
 
   conn.on('close', () => {

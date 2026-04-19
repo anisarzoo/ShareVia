@@ -532,7 +532,7 @@ function generateRoomCode() {
 
 /** E2EE Crypto Suite **/
 async function encryptPayload(data) {
-  const secret = state.e2eeSecret;
+  const secret = String(state.e2eeSecret || '').trim();
   if (!secret || !data) return data;
   
   try {
@@ -1540,7 +1540,7 @@ function setupConnection(connection, sourceLabel) {
   });
 
   connection.on('data', async (payload) => {
-    handleIncomingData(payload, peerId);
+    await handleIncomingData(payload, peerId);
   });
 
   connection.on('close', () => {
