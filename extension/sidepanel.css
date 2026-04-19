@@ -92,8 +92,12 @@ body {
   padding-bottom: 0;
 }
 
+/* Arrow rotation based on collapse state */
+.note-box-container .toggle-icon {
+  transform: rotate(180deg); /* Expanded = Up */
+}
 .note-box-container.collapsed-container .toggle-icon {
-  transform: rotate(180deg);
+  transform: rotate(0deg); /* Collapsed = Down */
 }
 
 .app-shell {
@@ -283,8 +287,16 @@ textarea { width: 100%; resize: none; min-height: 60px; font-family: inherit; }
 
 .note-item.unread {
   background: #fff;
+  border-left: 3px solid var(--brand-strong);
   border-color: var(--brand-strong);
-  box-shadow: 0 0 8px rgba(22, 159, 144, 0.15);
+  box-shadow: 0 3px 12px rgba(22, 159, 144, 0.12);
+  animation: unreadPulse 2s infinite ease-in-out;
+}
+
+@keyframes unreadPulse {
+  0% { box-shadow: 0 3px 12px rgba(22, 159, 144, 0.12); }
+  50% { box-shadow: 0 3px 20px rgba(22, 159, 144, 0.25); }
+  100% { box-shadow: 0 3px 12px rgba(22, 159, 144, 0.12); }
 }
 
 .badge {

@@ -942,12 +942,12 @@ body.web-join-mode footer {
   transform: rotate(180deg);
 }
 
-/* Fix rotation on toggle */
-.note-box-container:not(.collapsed-container) .toggle-icon {
-  transform: rotate(0deg);
+/* Arrow rotation based on collapse state */
+.note-box-container .toggle-icon {
+  transform: rotate(180deg); /* Expanded = Up */
 }
 .note-box-container.collapsed-container .toggle-icon {
-  transform: rotate(180deg);
+  transform: rotate(0deg); /* Collapsed = Down */
 }
 
 .note-box {
@@ -962,13 +962,22 @@ body.web-join-mode footer {
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(7, 69, 63, 0.12);
   font-size: 0.9rem;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
 .note-item.unread {
   background: #fff;
+  border-left: 4px solid var(--brand-strong);
   border-color: var(--brand-strong);
-  box-shadow: 0 0 10px rgba(22, 159, 144, 0.15);
+  box-shadow: 0 4px 15px rgba(22, 159, 144, 0.12);
+  animation: unreadPulse 2s infinite ease-in-out;
+}
+
+@keyframes unreadPulse {
+  0% { box-shadow: 0 4px 15px rgba(22, 159, 144, 0.12); }
+  50% { box-shadow: 0 4px 25px rgba(22, 159, 144, 0.25); }
+  100% { box-shadow: 0 4px 15px rgba(22, 159, 144, 0.12); }
 }
 
 .badge {
