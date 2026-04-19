@@ -250,6 +250,17 @@ input, select, textarea {
   background: rgba(22, 159, 144, 0.1);
   padding: 8px 12px; border-radius: 99px;
   font-size: 0.8rem; display: flex; justify-content: space-between; margin-bottom: 12px;
+  transition: all 0.3s ease;
+}
+
+.room-pill.disconnected {
+  background: rgba(200, 67, 52, 0.08);
+  border-color: rgba(200, 67, 52, 0.15);
+}
+
+.disconnected-text {
+  color: #d32f2f !important;
+  font-weight: 800;
 }
 
 .host-actions {
@@ -269,6 +280,13 @@ input, select, textarea {
   border-radius: 16px; padding: 24px 12px;
   text-align: center; margin-bottom: 12px;
   background: rgba(255, 255, 255, 0.4);
+}
+
+.drop-zone.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
 }
 .drop-title { font-weight: 700; margin-bottom: 12px; }
 .picker-group { display: flex; gap: 8px; justify-content: center; }

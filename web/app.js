@@ -567,10 +567,24 @@ function updateConnectedPeersLabel() {
   }
 
   const openConnections = getOpenConnections();
+  const pill = elements.remotePeerId.parentElement;
+
   if (!openConnections.length) {
-    elements.remotePeerId.textContent = '------';
+    elements.remotePeerId.textContent = 'Disconnected';
+    elements.remotePeerId.classList.add('disconnected-text');
+    elements.remotePeerId.classList.remove('loading-text');
+    if (pill && pill.classList.contains('room-pill')) {
+      pill.classList.add('disconnected');
+    }
+    updateInteractionState(false);
     return;
   }
+
+  elements.remotePeerId.classList.remove('disconnected-text', 'loading-text');
+  if (pill && pill.classList.contains('room-pill')) {
+    pill.classList.remove('disconnected');
+  }
+  updateInteractionState(true);
 
   if (openConnections.length === 1) {
     elements.remotePeerId.textContent = normalizePeerLabel(openConnections[0].peer);
@@ -578,6 +592,25 @@ function updateConnectedPeersLabel() {
   }
 
   elements.remotePeerId.textContent = `${openConnections.length} peers`;
+}
+
+function updateInteractionState(isEnabled) {
+  const elementsToToggle = [
+    elements.btnSendNote,
+    elements.btnPickFiles,
+    elements.btnPickFolder,
+    elements.textNote,
+    elements.fileInput,
+    elements.folderInput
+  ];
+
+  elementsToToggle.forEach(el => {
+    if (el) el.disabled = !isEnabled;
+  });
+
+  if (elements.dropZone) {
+    elements.dropZone.classList.toggle('disabled', !isEnabled);
+  }
 }
 
 function hasNativeBridge() {
@@ -2573,6 +2606,7 @@ function initialize() {
   // syncIceConfigFromV2();
   updateTransportBadge();
   updateStatus('Disconnected', 'disconnected');
+  updateInteractionState(false);
 
   bindEvents();
   setHistoryFilter('all');

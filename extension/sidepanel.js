@@ -75,6 +75,7 @@ function init() {
   applyConfigToUI();
   setupEventListeners();
   renderTransferHistory();
+  updateInteractionState(false);
 
   // Wake up signaling server early (Mitigates Render.com cold start)
   if (state.config.signalingHost) {
@@ -234,21 +235,62 @@ function showSetupStatus(msg, type = 'error') {
   }
 }
 
+function updateConnectedPeersLabel() {
+  if (!elements.remotePeerId) return;
+
+  const openCount = state.connections.size;
+  const pill = elements.remotePeerId.parentElement;
+
+  if (openCount === 0) {
+    elements.remotePeerId.textContent = 'Disconnected';
+    elements.remotePeerId.classList.add('disconnected-text');
+    if (pill) pill.classList.add('disconnected');
+    updateInteractionState(false);
+  } else {
+    const peerId = Array.from(state.connections.keys())[0];
+    elements.remotePeerId.textContent = normalizePeerLabel(peerId);
+    elements.remotePeerId.classList.remove('disconnected-text');
+    if (pill) pill.classList.remove('disconnected');
+    updateInteractionState(true);
+  }
+}
+
+function updateInteractionState(isEnabled) {
+  const elementsToToggle = [
+    elements.btnSendNote,
+    elements.btnPickFiles,
+    elements.btnPickFolder,
+    elements.textNote,
+    elements.fileInput,
+    elements.folderInput
+  ];
+
+  elementsToToggle.forEach(el => {
+    if (el) el.disabled = !isEnabled;
+  });
+
+  if (elements.dropZone) {
+    elements.dropZone.classList.toggle('disabled', !isEnabled);
+  }
+}
+
 function handlePeerDisconnect(peerId) {
   state.connections.delete(peerId);
-  const openCount = state.connections.size;
-  if (openCount > 0) {
+  updateConnectedPeersLabel();
+  
+  if (state.connections.size > 0) {
     addNoteToInbox(`❌ ${normalizePeerLabel(peerId)} has left the room.`, 'System');
-    return;
+  } else {
+    logActivity(`Connection lost with ${normalizePeerLabel(peerId)}.`, 'Warning');
   }
-  resetApp();
 }
 
 function setupConnection(conn) {
   conn.on('open', () => {
     state.connections.set(conn.peer, conn);
-    elements.remotePeerId.textContent = conn.peer;
+    updateConnectedPeersLabel();
     showSection(elements.shareSection);
+    logActivity(`Connected to ${normalizePeerLabel(conn.peer)}.`);
   });
 
   conn.on('data', (data) => {
@@ -256,6 +298,11 @@ function setupConnection(conn) {
   });
 
   conn.on('close', () => {
+    handlePeerDisconnect(conn.peer);
+  });
+
+  conn.on('error', (err) => {
+    console.error('Conn error:', err);
     handlePeerDisconnect(conn.peer);
   });
 }
