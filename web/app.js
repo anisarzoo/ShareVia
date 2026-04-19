@@ -485,36 +485,49 @@ function playNotificationSound(type = 'default') {
       audioContextInstance = new AudioCtx();
     }
     
-    // Resume context if suspended (common in many browsers)
     if (audioContextInstance.state === 'suspended') {
       audioContextInstance.resume();
     }
     
     const audioContent = audioContextInstance;
-    const oscillator = audioContent.createOscillator();
-    const gainNode = audioContent.createGain();
+    
+    // Premium Sound Design: Multi-oscillator harmonic chime
+    const playBell = (freq, duration, richness = 1) => {
+      const now = audioContent.currentTime;
+      const gainNode = audioContent.createGain();
+      gainNode.connect(audioContent.destination);
+      
+      // Main tone
+      const osc1 = audioContent.createOscillator();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(freq, now);
+      osc1.connect(gainNode);
+      
+      // Harmonic tone
+      const osc2 = audioContent.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(freq * 1.501, now); // Perfect fifth + slight detune
+      osc2.connect(gainNode);
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContent.destination);
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.08, now + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + duration);
+      osc2.stop(now + duration);
+    };
 
     if (type === 'message' || type === 'note') {
-      // Soft high-pitched "ping" for messages
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(880, audioContent.currentTime); 
-      oscillator.frequency.exponentialRampToValueAtTime(1046.50, audioContent.currentTime + 0.1); 
-      gainNode.gain.setValueAtTime(0.1, audioContent.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContent.currentTime + 0.3);
-      oscillator.start();
-      oscillator.stop(audioContent.currentTime + 0.3);
-    } else {
-      // Slightly deeper "boop-beep" for file starts
-      oscillator.type = 'triangle';
-      oscillator.frequency.setValueAtTime(523.25, audioContent.currentTime); 
-      oscillator.frequency.exponentialRampToValueAtTime(783.99, audioContent.currentTime + 0.1); 
-      gainNode.gain.setValueAtTime(0.1, audioContent.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContent.currentTime + 0.4);
-      oscillator.start();
-      oscillator.stop(audioContent.currentTime + 1.0); // Slightly longer stop to avoid clipping
+      // High-frequency 'glass' chime
+      playBell(1174.66, 0.4); // D6
+      setTimeout(() => playBell(1567.98, 0.5), 60); // G6 shortly after
+    } else if (type === 'file') {
+      // Pleasant rising minor-third chord
+      playBell(523.25, 0.6); // C5
+      setTimeout(() => playBell(659.25, 0.7), 80); // E5
+      setTimeout(() => playBell(783.99, 0.8), 160); // G5
     }
   } catch (e) {
     console.warn('Audio play failed', e);
@@ -1661,6 +1674,11 @@ function updateTransferProgress(id, progress, transferredBytes, totalBytes, star
   const right = `${formatBytes(transferredBytes)} / ${formatBytes(totalBytes)}`;
   status.textContent = `${left} (${right})`;
   speed.textContent = formatThroughput(transferredBytes, startTs);
+
+  // UX Improvement: Dynamic Tab Title for multitasking
+  if (progress > 0 && progress < 100) {
+    document.title = `(${Math.round(progress)}%) ShareVia`;
+  }
 }
 
 function markTransferComplete(id, statusLabel) {
@@ -1671,6 +1689,9 @@ function markTransferComplete(id, statusLabel) {
   if (bar) bar.classList.add('complete');
   if (status && statusLabel) status.textContent = statusLabel;
   if (speed) speed.textContent = 'Finished';
+  
+  // UX Improvement: Reset tab title when transfer completes
+  document.title = 'ShareVia - P2P File Transfer';
 }
 
 function addDownloadAction(id, url, fileName) {
@@ -1871,6 +1892,9 @@ function handleIncomingFileStart(payload, fromPeerId = '') {
   createTransferUI(transferKey, `${payload.name} from ${fromLabel}`, payload.size, 'incoming', record.startedAt);
   logActivity(`Receiving file: ${payload.name} from ${fromLabel}`);
   playNotificationSound('file');
+
+  // UX Improvement: Short vibration pulse for incoming file
+  if (navigator.vibrate) navigator.vibrate(60);
 }
 
 function handleIncomingFileChunk(payload, fromPeerId = '') {
@@ -2322,10 +2346,15 @@ async function startScanner() {
     return;
   }
 
+  // UX Improvement: Decouple modal open from heavy camera start 
+  // for instant UI feedback
+  await new Promise(r => setTimeout(r, 100));
+
   try {
     if (!state.html5QrCode) {
       state.html5QrCode = new Html5Qrcode('qr-reader');
     }
+
 
     state.scannerActive = true;
 
@@ -2367,6 +2396,9 @@ function handleScanResult(decodedText) {
   if (!roomId) {
     return;
   }
+
+  // UX Improvement: Success vibration feedback
+  if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
 
   stopScanner();
   if (elements.webJoinIdInput) {
