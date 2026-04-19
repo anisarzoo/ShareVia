@@ -1965,39 +1965,51 @@ function addDownloadAction(id, url, fileName) {
   headRight.prepend(buttonGroup);
 }
 
-async function handleIncomingData(payload, fromPeerId = '') {
+async function handleIncomingData(payload, fromPeer) {
   let data = payload;
 
   if (payload && payload.type === 'e2ee-wrap') {
     data = await decryptPayload(payload);
-    if (!data) return; // Drop unauthenticated or corrupt data
+    if (!data) return; 
   }
 
-  if (!data || typeof data !== 'object') return;
+  // Double check if payload was actually unlocked
+  if (!data || !data.type) {
+    console.warn('[Protocol] Received invalid or undecrypted payload.');
+    return;
+  }
 
+  // Route to handlers
   switch (data.type) {
+    case 'text-note':
+    case 'transfer.note':
+      handleIncomingNote(data, fromPeer);
+      break;
     case 'file-start':
-      handleIncomingFileStart(payload, fromPeerId);
+    case 'transfer.start':
+      handleIncomingFileStart(data, fromPeer);
       break;
     case 'file-chunk':
-      handleIncomingFileChunk(payload, fromPeerId);
+    case 'transfer.chunk':
+      handleIncomingFileChunk(data, fromPeer);
       break;
     case 'file-end':
-      handleIncomingFileEnd(payload, fromPeerId);
+    case 'transfer.end':
+      handleIncomingFileEnd(data, fromPeer);
       break;
     case 'file-ack':
-      handleIncomingAck(payload, fromPeerId);
+    case 'transfer.ack':
+      handleIncomingAck(data, fromPeer);
       break;
     case 'file-cancel':
-      handleIncomingCancel(payload, fromPeerId);
-      break;
-    case 'text-note':
-      handleIncomingNote(payload, fromPeerId);
+    case 'transfer.cancel':
+      handleIncomingCancel(data, fromPeer);
       break;
     case 'capabilities':
-      logActivity('Remote device capabilities received.');
+      console.log(`[E2EE] Remote capabilities for ${fromPeer} processed.`);
       break;
     default:
+      console.warn(`[Protocol] Unhandled data type: ${data.type}`);
       break;
   }
 }
