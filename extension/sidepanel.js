@@ -34,10 +34,24 @@ const ID_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 /** E2EE Crypto Suite **/
 async function encryptPayload(data) {
   const secret = state.myId || Array.from(state.connections.keys())[0];
-  if (!secret) return data;
+  if (!secret || !data) return data;
   
   try {
     const encoder = new TextEncoder();
+
+    // Binary safe: Check for ArrayBuffer and convert to Base64
+    let payloadToEncrypt = data;
+    if (data.chunk && (data.chunk instanceof ArrayBuffer || data.chunk instanceof Uint8Array)) {
+      const buffer = data.chunk instanceof ArrayBuffer ? data.chunk : data.chunk.buffer;
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+      payloadToEncrypt = { ...data, chunk: base64, _isBinary: true };
+    }
+
     const keyMaterial = await crypto.subtle.importKey(
       'raw', 
       encoder.encode(secret.padEnd(32, 's')),
@@ -50,7 +64,7 @@ async function encryptPayload(data) {
     const encrypted = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv },
       keyMaterial,
-      encoder.encode(JSON.stringify(data))
+      encoder.encode(JSON.stringify(payloadToEncrypt))
     );
 
     return {
@@ -86,7 +100,20 @@ async function decryptPayload(wrapped) {
       new Uint8Array(wrapped.cipher)
     );
 
-    return JSON.parse(new TextDecoder().decode(decrypted));
+    const decryptedStr = new TextDecoder().decode(decrypted);
+    const data = JSON.parse(decryptedStr);
+
+    // Binary safe: Restore ArrayBuffer from Base64
+    if (data._isBinary && data.chunk) {
+      const binaryString = atob(data.chunk);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      data.chunk = bytes.buffer;
+    }
+
+    return data;
   } catch (e) {
     console.error('Decryption failed. Room code mismatch?', e);
     return null;
