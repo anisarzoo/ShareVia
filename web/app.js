@@ -532,16 +532,12 @@ function generateRoomCode() {
 
 /** E2EE Crypto Suite **/
 async function encryptPayload(data) {
-  // Fallback watchdog: if state is lost, pull from UI elements
+  // Watchdog fallback
   let secret = state.e2eeSecret || (elements.myPeerId ? elements.myPeerId.textContent : null) || (elements.webJoinIdInput ? elements.webJoinIdInput.value : null);
   secret = String(secret || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   
-  if (!secret || secret.length < 6 || !data) {
-    console.log('[E2EE] Skipping encryption: No valid key found.');
-    return data;
-  }
+  if (!secret || secret.length < 6 || !data) return data;
   
-  console.warn(`[E2EE] Encrypting ${data.type} with key: ${secret}`);
   try {
     const encoder = new TextEncoder();
     
@@ -597,10 +593,7 @@ async function decryptPayload(wrapped) {
   let secret = state.e2eeSecret || (elements.myPeerId ? elements.myPeerId.textContent : null) || (elements.webJoinIdInput ? elements.webJoinIdInput.value : null);
   secret = String(secret || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  if (!secret || secret.length < 6) {
-    console.warn('[E2EE] Cannot decrypt: No key available.');
-    return null;
-  }
+  if (!secret || secret.length < 6) return null;
 
   try {
     const encoder = new TextEncoder();
@@ -627,7 +620,6 @@ async function decryptPayload(wrapped) {
 
     const decryptedStr = new TextDecoder().decode(decrypted);
     const data = JSON.parse(decryptedStr);
-    console.log(`[E2EE] Decrypted ${data.type} successfully.`);
 
     // Restore ArrayBuffer from Base64 if it was binary
     if (data._isBinary && data.chunk) {
@@ -789,8 +781,7 @@ function configurePlatformMode() {
 
 
   if (elements.setupTitle) {
-    elements.setupTitle.textContent = nativeMode ? 'Quick Share' : 'ShareVia Web Client';
-    console.warn('[ShareVia] Core v2.1.0-trace-active loaded.');
+    elements.setupTitle.textContent = nativeMode ? 'Quick Share' : 'Share Files Online';
   }
   if (elements.setupSubtitle) {
     elements.setupSubtitle.textContent = 'Send or receive files with anyone, anywhere. No account needed.';
