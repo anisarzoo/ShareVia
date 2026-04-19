@@ -2497,22 +2497,36 @@ async function startScanner() {
     logActivity('Scanner started.');
   } catch (error) {
     console.error('Scanner start error:', error);
-    if (error.name === 'NotAllowedError') {
-      alert('Camera access blocked. Click the "Lock" or "Controls" icon next to the website URL (top left) to enable camera permissions and try again.');
-    } else if (error.name === 'NotFoundError') {
-      alert('No camera found on this device.');
+    state.scannerActive = false; // Reset state if start fails
+    
+    if (error === 'NotAllowedError' || (error.name && error.name === 'NotAllowedError')) {
+      showCustomModal('Camera Blocked', 'Camera access is blocked. Click the **Lock icon** in your browser search bar (top left) to allow camera permissions for this site.');
+    } else if (error === 'NotFoundError' || (error.name && error.name === 'NotFoundError')) {
+      showCustomModal('No Camera', 'No camera was found on this device. Please enter the room code manually.');
     } else {
-      alert('Unable to start camera. Error: ' + error.name);
+      showCustomModal('Camera Error', `Unable to start camera. Error: ${error.name || error || 'Unknown'}`);
     }
     stopScanner();
   }
 }
 
+function showCustomModal(title, message) {
+  const modal = document.getElementById('message-modal');
+  const titleEl = document.getElementById('msg-modal-title');
+  const bodyEl = document.getElementById('msg-modal-body');
+  
+  if (modal && titleEl && bodyEl) {
+    titleEl.textContent = title;
+    bodyEl.innerHTML = message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    modal.classList.remove('hidden');
+  }
+}
+
 function stopScanner() {
   if (state.html5QrCode && state.scannerActive) {
-    state.html5QrCode.stop().catch((error) => {
-      console.warn('Scanner stop error:', error);
-    });
+    try {
+      state.html5QrCode.stop().catch(() => {});
+    } catch (e) {}
   }
 
   state.scannerActive = false;
@@ -2569,6 +2583,13 @@ function bindEvents() {
 
   const btnCloseScanner = document.getElementById('btn-close-scanner');
   if (btnCloseScanner) btnCloseScanner.addEventListener('click', stopScanner);
+
+  const btnCloseMsgModal = document.getElementById('btn-close-msg-modal');
+  if (btnCloseMsgModal) {
+    btnCloseMsgModal.onclick = () => {
+      document.getElementById('message-modal').classList.add('hidden');
+    };
+  }
 
   if (elements.btnHeaderDisconnect) {
     elements.btnHeaderDisconnect.addEventListener('click', () => resetToSetup({ destroyPeer: true }));

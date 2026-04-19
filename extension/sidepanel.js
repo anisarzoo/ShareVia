@@ -181,8 +181,12 @@ function showSection(section) {
   if (section === elements.shareSection) {
     elements.transfersPanel.classList.remove('hidden');
   } else {
-    elements.transfersPanel.classList.add('hidden');
-  }
+    document.getElementById('message-modal').classList.add('hidden');
+  };
+
+  document.getElementById('btn-close-msg-modal').onclick = () => {
+    document.getElementById('message-modal').classList.add('hidden');
+  };
 
   if (section === elements.setupSection) {
     elements.btnHeaderDisconnect.classList.add('hidden');
@@ -856,21 +860,37 @@ async function startScanner() {
     state.scannerActive = true;
   } catch (err) {
     console.error(err);
+    state.scannerActive = false;
     if (err.name === 'NotAllowedError') {
-      alert('Camera access blocked. Please check your browser extension settings or site permissions to allow camera access.');
+      showCustomModal('Camera Blocked', 'Camera access is blocked. Please check your browser **extension settings** or site permissions to allow camera access.');
     } else {
-      alert("Camera access failed: " + err.name);
+      showCustomModal('Camera Failed', "Camera access failed: " + (err.name || err || 'Unknown'));
     }
     stopScanner();
   }
 }
 
+function showCustomModal(title, message) {
+  const modal = document.getElementById('message-modal');
+  const titleEl = document.getElementById('msg-modal-title');
+  const bodyEl = document.getElementById('msg-modal-body');
+  
+  if (modal && titleEl && bodyEl) {
+    titleEl.textContent = title;
+    bodyEl.innerHTML = message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    modal.classList.remove('hidden');
+  }
+}
+
 function stopScanner() {
   if (state.html5QrCode && state.scannerActive) {
-    state.html5QrCode.stop();
-    state.scannerActive = false;
+    try {
+      state.html5QrCode.stop().catch(() => {});
+    } catch (e) {}
   }
-  elements.scannerModal.classList.add('hidden');
+  state.scannerActive = false;
+  document.getElementById('scanner-modal').classList.add('hidden');
+  document.getElementById('qr-skeleton').classList.remove('hidden');
 }
 
 function extractRoomId(text) {
