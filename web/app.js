@@ -2561,6 +2561,7 @@ function showCustomModal(title, message, options = {}) {
   const titleEl = document.getElementById('msg-modal-title');
   const bodyEl = document.getElementById('msg-modal-body');
   const closeBtn = document.getElementById('btn-close-msg-modal');
+  const optBtn = document.getElementById('btn-opt-msg-modal');
   
   if (modal && titleEl && bodyEl) {
     titleEl.textContent = title;
@@ -2572,9 +2573,15 @@ function showCustomModal(title, message, options = {}) {
          modal.classList.add('hidden');
          startScanner();
        };
+       if (optBtn) {
+         optBtn.textContent = 'Close';
+         optBtn.classList.remove('hidden');
+         optBtn.onclick = () => modal.classList.add('hidden');
+       }
     } else {
        closeBtn.textContent = 'Got it';
        closeBtn.onclick = () => modal.classList.add('hidden');
+       if (optBtn) optBtn.classList.add('hidden');
     }
 
     modal.classList.remove('hidden');
