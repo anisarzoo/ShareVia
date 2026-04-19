@@ -207,7 +207,7 @@ input, select, textarea {
   cursor: pointer; font-size: 0.9rem;
   transition: transform 0.1s;
 }
-.btn-secondary { background: rgba(22, 159, 144, 0.1); color: var(--brand-strong); border: 1px solid rgba(22, 159, 144, 0.2); }
+.btn-secondary { background: rgba(22, 159, 144, 0.1); color: #169f90; border: 1px solid rgba(22, 159, 144, 0.2); }
 .btn-dark { background: #132726; color: #fff; }
 .btn-ghost { background: transparent; color: var(--text-soft); text-decoration: underline; }
 .btn-danger-soft {
