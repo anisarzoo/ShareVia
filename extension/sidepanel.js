@@ -8,6 +8,9 @@ const DEFAULT_CONFIG = {
   ackEvery: 32,
 };
 
+let audioContextInstance = null;
+
+
 const STORAGE_KEY = 'sharevia_config_ext_v1';
 const HISTORY_STORAGE_KEY = 'sharevia_history_ext_v1';
 const WEB_APP_URL = 'https://sharevia.netlify.app/';
@@ -70,6 +73,12 @@ function init() {
   applyConfigToUI();
   setupEventListeners();
   renderTransferHistory();
+
+  // Wake up signaling server early (Mitigates Render.com cold start)
+  if (state.config.signalingHost) {
+    const protocol = state.config.signalingSecure ? 'https' : 'http';
+    fetch(`${protocol}://${state.config.signalingHost}/ping`).catch(() => {});
+  }
 }
 
 function loadConfig() {
@@ -130,6 +139,45 @@ function copyToClipboard(text, btn) {
   });
 }
 
+function playNotificationSound(type = 'default') {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!audioContextInstance) audioContextInstance = new AudioCtx();
+    if (audioContextInstance.state === 'suspended') audioContextInstance.resume();
+    
+    const audioContent = audioContextInstance;
+    const playBell = (freq, duration) => {
+      const now = audioContent.currentTime;
+      const gainNode = audioContent.createGain();
+      gainNode.connect(audioContent.destination);
+      const osc1 = audioContent.createOscillator();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(freq, now);
+      osc1.connect(gainNode);
+      const osc2 = audioContent.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(freq * 1.501, now);
+      osc2.connect(gainNode);
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.08, now + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      osc1.start(now); osc2.start(now);
+      osc1.stop(now + duration); osc2.stop(now + duration);
+    };
+
+    if (type === 'message' || type === 'note') {
+      playBell(1174.66, 0.4); 
+      setTimeout(() => playBell(1567.98, 0.5), 60);
+    } else if (type === 'file') {
+      playBell(523.25, 0.6);
+      setTimeout(() => playBell(659.25, 0.7), 80);
+      setTimeout(() => playBell(783.99, 0.8), 160);
+    }
+  } catch (e) {}
+}
+
+
 // --- Peer Logic ---
 
 function initPeer(id = null) {
@@ -149,7 +197,12 @@ function initPeer(id = null) {
   state.peer.on('open', (myId) => {
     state.myId = myId;
     elements.myPeerId.textContent = myId;
+    elements.myPeerId.classList.remove('loading-text');
     generateQRCode(myId);
+    
+    const h2 = elements.hostingSection.querySelector('h2');
+    if (h2) h2.textContent = 'Room Ready';
+    
     showSection(elements.hostingSection);
   });
 
@@ -205,6 +258,8 @@ function setupConnection(conn) {
 function handleIncomingData(data, fromPeer) {
   switch (data.type) {
     case 'file-start':
+      if (navigator.vibrate) navigator.vibrate(60);
+      playNotificationSound('file');
       startIncomingTransfer(data, fromPeer);
       break;
     case 'file-chunk':
@@ -214,6 +269,7 @@ function handleIncomingData(data, fromPeer) {
       finishIncomingTransfer(data, fromPeer);
       break;
     case 'text-note':
+      playNotificationSound('message');
       addNoteToInbox(data.text, fromPeer);
       break;
     case 'file-cancel':
@@ -507,6 +563,17 @@ function resetApp() {
 function setupEventListeners() {
   elements.btnDashboardSend.onclick = () => {
     const roomId = Math.floor(100000 + Math.random() * 900000).toString();
+    playNotificationSound('silent');
+    
+    // Instant UI
+    elements.myPeerId.textContent = roomId;
+    elements.myPeerId.classList.add('loading-text');
+    generateQRCode(roomId);
+    
+    const h2 = elements.hostingSection.querySelector('h2');
+    if (h2) h2.textContent = 'Creating Room...';
+    
+    showSection(elements.hostingSection);
     initPeer(roomId);
   };
 
@@ -522,8 +589,18 @@ function setupEventListeners() {
   elements.btnWebJoin.onclick = () => {
     const id = elements.webJoinIdInput.value.trim();
     if (id.length === 6) {
+      playNotificationSound('silent');
+      elements.btnWebJoin.disabled = true;
+      elements.btnWebJoin.textContent = 'Joining...';
+      
+      showSection(elements.shareSection);
+      elements.remotePeerId.textContent = `Connecting to ${id}...`;
+      elements.remotePeerId.classList.add('loading-text');
+
       initPeer();
       state.peer.on('open', () => {
+        elements.btnWebJoin.disabled = false;
+        elements.btnWebJoin.textContent = 'Join';
         const conn = state.peer.connect(id);
         setupConnection(conn);
       });
@@ -561,6 +638,13 @@ function setupEventListeners() {
     }
   };
 
+  elements.textNote.onkeydown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      elements.btnSendNote.click();
+    }
+  };
+
   elements.btnWebScan.onclick = () => startScanner();
   elements.btnCloseScanner.onclick = () => stopScanner();
 }
@@ -592,6 +676,7 @@ async function startScanner() {
       (decodedText) => {
         const id = extractRoomId(decodedText);
         if (id) {
+          if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
           elements.webJoinIdInput.value = id;
           stopScanner();
           elements.btnWebJoin.click();
