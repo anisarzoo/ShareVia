@@ -118,11 +118,22 @@
           </div>
         </div>
 
-        <div class="note-box">
-          <textarea id="text-note" rows="2" placeholder="Send a quick message..."></textarea>
-          <button id="btn-send-note" class="btn btn-secondary full">Send Note</button>
+        <div class="note-box-container">
+          <button id="btn-toggle-notes" class="btn btn-notes-toggle" type="button">
+            <div style="display:flex; align-items:center;">
+              Quick Message
+              <span id="note-badge" class="badge hidden"></span>
+            </div>
+            <span class="toggle-icon">⌄</span>
+          </button>
+          <div id="notes-collapsible" class="collapsible-content collapsed">
+            <div class="note-box">
+              <textarea id="text-note" rows="2" placeholder="Send a quick message..."></textarea>
+              <button id="btn-send-note" class="btn btn-secondary full">Send Note</button>
+            </div>
+            <div id="note-inbox" class="note-inbox"></div>
+          </div>
         </div>
-        <div id="note-inbox" class="note-inbox"></div>
       </section>
 
       <section id="transfers-panel" class="panel hidden">

@@ -58,6 +58,7 @@ const state = {
   lastRoomId: null,
   lastJoinRoomId: null,
   dashboardMode: 'idle',
+  unreadNotesCount: 0,
 
   nativeCapabilities: null,
   transferHistory: loadTransferHistory(),
@@ -94,6 +95,8 @@ const elements = {
   btnPickFiles: document.getElementById('btn-pick-files'),
   btnPickFolder: document.getElementById('btn-pick-folder'),
   noteInbox: document.getElementById('note-inbox'),
+  noteBadge: document.getElementById('note-badge'),
+  btnSendNote: document.getElementById('btn-send-note'),
   textNote: document.getElementById('text-note'),
   scannerModal: document.getElementById('scanner-modal'),
   advancedPanel: document.getElementById('advanced-panel'),
@@ -480,58 +483,40 @@ function playNotificationSound(type = 'default') {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
-    
-    if (!audioContextInstance) {
-      audioContextInstance = new AudioCtx();
-    }
-    
-    if (audioContextInstance.state === 'suspended') {
-      audioContextInstance.resume();
-    }
+    if (!audioContextInstance) audioContextInstance = new AudioCtx();
+    if (audioContextInstance.state === 'suspended') audioContextInstance.resume();
     
     const audioContent = audioContextInstance;
     
-    // Premium Sound Design: Multi-oscillator harmonic chime
-    const playBell = (freq, duration, richness = 1) => {
+    // Simple, clean 'Ping' sound
+    const playPing = (freq, duration, volume = 0.1) => {
       const now = audioContent.currentTime;
-      const gainNode = audioContent.createGain();
-      gainNode.connect(audioContent.destination);
+      const osc = audioContent.createOscillator();
+      const gain = audioContent.createGain();
       
-      // Main tone
-      const osc1 = audioContent.createOscillator();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(freq, now);
-      osc1.connect(gainNode);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
       
-      // Harmonic tone
-      const osc2 = audioContent.createOscillator();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(freq * 1.501, now); // Perfect fifth + slight detune
-      osc2.connect(gainNode);
-
-      gainNode.gain.setValueAtTime(0, now);
-      gainNode.gain.linearRampToValueAtTime(0.08, now + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-      osc1.start(now);
-      osc2.start(now);
-      osc1.stop(now + duration);
-      osc2.stop(now + duration);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(volume, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      
+      osc.connect(gain);
+      gain.connect(audioContent.destination);
+      
+      osc.start(now);
+      osc.stop(now + duration);
     };
 
     if (type === 'message' || type === 'note') {
-      // High-frequency 'glass' chime
-      playBell(1174.66, 0.4); // D6
-      setTimeout(() => playBell(1567.98, 0.5), 60); // G6 shortly after
+      // One crisp high ping
+      playPing(880, 0.4); 
     } else if (type === 'file') {
-      // Pleasant rising minor-third chord
-      playBell(523.25, 0.6); // C5
-      setTimeout(() => playBell(659.25, 0.7), 80); // E5
-      setTimeout(() => playBell(783.99, 0.8), 160); // G5
+      // Soft double-tap blip
+      playPing(660, 0.2, 0.07);
+      setTimeout(() => playPing(880, 0.2, 0.07), 80);
     }
-  } catch (e) {
-    console.warn('Audio play failed', e);
-  }
+  } catch (e) {}
 }
 
 function generateRoomCode() {
@@ -1321,6 +1306,7 @@ function handlePeerConnectionClosed(peerId, options = {}) {
   if (openCount > 0) {
     updateStatus('Connected', 'connected');
     logActivity(`${normalizePeerLabel(peerId)} disconnected. ${openCount} peer(s) still connected.`, 'Warning');
+    addNoteToInbox(`❌ ${normalizePeerLabel(peerId)} has left the room.`, false);
     return;
   }
 
@@ -1411,8 +1397,7 @@ function setupConnection(connection, sourceLabel) {
   });
 
   connection.on('close', () => {
-    clearConnectionTimeout(peerId);
-    finalizeConnection(true);
+    handlePeerConnectionClosed(peerId);
   });
 
   connection.on('error', (error) => {
@@ -2001,10 +1986,39 @@ function handleIncomingNote(payload, fromPeerId = '') {
 }
 
 function addNoteToInbox(text, isSelf) {
+  const notesCollapsible = document.getElementById('notes-collapsible');
+  const isCollapsed = notesCollapsible ? notesCollapsible.classList.contains('collapsed') : false;
+  const isUnread = !isSelf && isCollapsed;
+
   const item = document.createElement('div');
-  item.className = `note-item ${isSelf ? 'self' : ''}`.trim();
-  item.textContent = text;
+  item.className = `note-item ${isSelf ? 'self' : ''} ${isUnread ? 'unread' : ''}`.trim();
+
+  const content = document.createElement('div');
+  content.className = 'note-content';
+  content.textContent = text;
+
+  const time = document.createElement('span');
+  time.className = 'note-time';
+  time.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  item.appendChild(content);
+  item.appendChild(time);
   elements.noteInbox.prepend(item);
+
+  if (isUnread) {
+    state.unreadNotesCount++;
+    updateNoteBadge();
+  }
+}
+
+function updateNoteBadge() {
+  if (!elements.noteBadge) return;
+  if (state.unreadNotesCount > 0) {
+    elements.noteBadge.textContent = state.unreadNotesCount;
+    elements.noteBadge.classList.remove('hidden');
+  } else {
+    elements.noteBadge.classList.add('hidden');
+  }
 }
 
 async function waitForBufferSpace(connection) {
@@ -2445,7 +2459,12 @@ function bindEvents() {
     event.preventDefault();
     saveAdvancedConfig();
   });
-  document.getElementById('btn-send-note').addEventListener('click', queueNote);
+
+  elements.historyTabs.forEach((button) => {
+    button.addEventListener('click', () => {
+      setHistoryFilter(button.dataset.historyTab || 'all');
+    });
+  });
   elements.btnShowMyCode && elements.btnShowMyCode.addEventListener('click', hostRoom);
   elements.btnShareOnlineLink && elements.btnShareOnlineLink.addEventListener('click', shareRoomLink);
 
@@ -2473,6 +2492,24 @@ function bindEvents() {
       joinRoom(elements.webJoinIdInput.value);
     }
   });
+
+  elements.btnSendNote.addEventListener('click', queueNote);
+
+  const btnToggleNotes = document.getElementById('btn-toggle-notes');
+  const notesCollapsible = document.getElementById('notes-collapsible');
+  if (btnToggleNotes && notesCollapsible) {
+    btnToggleNotes.onclick = () => {
+      const isCollapsed = notesCollapsible.classList.toggle('collapsed');
+      btnToggleNotes.parentElement.classList.toggle('collapsed-container', isCollapsed);
+      
+      if (!isCollapsed) {
+        state.unreadNotesCount = 0;
+        updateNoteBadge();
+        // Clear all unread highlights
+        document.querySelectorAll('.note-item.unread').forEach(el => el.classList.remove('unread'));
+      }
+    };
+  }
 
   elements.textNote.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {

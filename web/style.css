@@ -892,16 +892,112 @@ body.web-join-mode footer {
   gap: 8px;
 }
 
+.note-box-container {
+  margin-top: 15px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 16px;
+  border: 1px solid rgba(7, 69, 63, 0.08);
+  overflow: hidden;
+}
+
+.btn-notes-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: transparent;
+  color: var(--brand-strong);
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-notes-toggle:hover {
+  background: rgba(22, 159, 144, 0.05);
+}
+
+.toggle-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.collapsible-content {
+  max-height: 1000px;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.4s ease;
+  padding: 0 16px 16px;
+}
+
+.collapsible-content.collapsed {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.collapsible-content.collapsed + .btn-notes-toggle .toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Fix rotation on toggle */
+.note-box-container:not(.collapsed-container) .toggle-icon {
+  transform: rotate(0deg);
+}
+.note-box-container.collapsed-container .toggle-icon {
+  transform: rotate(180deg);
+}
+
+.note-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .note-item {
   border-radius: 12px;
   padding: 10px;
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(7, 69, 63, 0.12);
   font-size: 0.9rem;
+  transition: all 0.3s ease;
 }
+
+.note-item.unread {
+  background: #fff;
+  border-color: var(--brand-strong);
+  box-shadow: 0 0 10px rgba(22, 159, 144, 0.15);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  background: #ff4d4d;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  border-radius: 9px;
+  margin-left: 8px;
+}
+
+.badge.hidden { display: none; }
 
 .note-item.self {
   background: rgba(22, 159, 144, 0.16);
+}
+
+.note-time {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-soft);
+  opacity: 0.6;
+  text-align: right;
+  margin-top: 2px;
 }
 
 .transfer-list {

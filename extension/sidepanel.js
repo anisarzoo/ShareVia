@@ -26,6 +26,7 @@ const state = {
   historyFilter: 'all',
   html5QrCode: null,
   scannerActive: false,
+  unreadNotesCount: 0,
 };
 
 const elements = {
@@ -33,6 +34,7 @@ const elements = {
   hostingSection: document.getElementById('hosting-section'),
   shareSection: document.getElementById('share-section'),
   transfersPanel: document.getElementById('transfers-panel'),
+  noteBadge: document.getElementById('note-badge'),
   
   btnDashboardSend: document.getElementById('btn-dashboard-send'),
   webJoinIdInput: document.getElementById('web-join-id'),
@@ -147,32 +149,26 @@ function playNotificationSound(type = 'default') {
     if (audioContextInstance.state === 'suspended') audioContextInstance.resume();
     
     const audioContent = audioContextInstance;
-    const playBell = (freq, duration) => {
+    const playPing = (freq, duration, volume = 0.1) => {
       const now = audioContent.currentTime;
-      const gainNode = audioContent.createGain();
-      gainNode.connect(audioContent.destination);
-      const osc1 = audioContent.createOscillator();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(freq, now);
-      osc1.connect(gainNode);
-      const osc2 = audioContent.createOscillator();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(freq * 1.501, now);
-      osc2.connect(gainNode);
-      gainNode.gain.setValueAtTime(0, now);
-      gainNode.gain.linearRampToValueAtTime(0.08, now + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
-      osc1.start(now); osc2.start(now);
-      osc1.stop(now + duration); osc2.stop(now + duration);
+      const osc = audioContent.createOscillator();
+      const gain = audioContent.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(volume, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      osc.connect(gain);
+      gain.connect(audioContent.destination);
+      osc.start(now);
+      osc.stop(now + duration);
     };
 
     if (type === 'message' || type === 'note') {
-      playBell(1174.66, 0.4); 
-      setTimeout(() => playBell(1567.98, 0.5), 60);
+      playPing(880, 0.4); 
     } else if (type === 'file') {
-      playBell(523.25, 0.6);
-      setTimeout(() => playBell(659.25, 0.7), 80);
-      setTimeout(() => playBell(783.99, 0.8), 160);
+      playPing(660, 0.2, 0.07);
+      setTimeout(() => playPing(880, 0.2, 0.07), 80);
     }
   } catch (e) {}
 }
@@ -238,6 +234,16 @@ function showSetupStatus(msg, type = 'error') {
   }
 }
 
+function handlePeerDisconnect(peerId) {
+  state.connections.delete(peerId);
+  const openCount = state.connections.size;
+  if (openCount > 0) {
+    addNoteToInbox(`❌ ${normalizePeerLabel(peerId)} has left the room.`, 'System');
+    return;
+  }
+  resetApp();
+}
+
 function setupConnection(conn) {
   conn.on('open', () => {
     state.connections.set(conn.peer, conn);
@@ -250,8 +256,7 @@ function setupConnection(conn) {
   });
 
   conn.on('close', () => {
-    state.connections.delete(conn.peer);
-    if (state.connections.size === 0) resetApp();
+    handlePeerDisconnect(conn.peer);
   });
 }
 
@@ -531,14 +536,37 @@ function handleRemoteCancel(data, fromPeer) {
 }
 
 function addNoteToInbox(text, sender) {
+  const notesCollapsible = document.getElementById('notes-collapsible');
+  const isCollapsed = notesCollapsible ? notesCollapsible.classList.contains('collapsed') : false;
+  const isUnread = sender !== 'me' && isCollapsed;
+
   const item = document.createElement('div');
-  item.className = 'note-item';
-  item.style.padding = '10px';
-  item.style.background = '#fff';
-  item.style.borderRadius = '10px';
-  item.style.border = '1px solid var(--panel-border)';
-  item.innerHTML = `<small style="color:var(--text-soft); font-weight:700;">${sender === 'me' ? 'You' : sender}:</small><div style="margin-top:2px;">${text}</div>`;
+  item.className = `note-item ${isUnread ? 'unread' : ''}`.trim();
+
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  item.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items: baseline; margin-bottom: 2px;">
+      <small style="color:var(--text-soft); font-weight:700; font-size: 0.7rem;">${sender === 'me' ? 'You' : sender}</small>
+      <span style="font-size: 0.6rem; opacity: 0.5;">${time}</span>
+    </div>
+    <div style="font-size: 0.85rem; line-height: 1.3;">${text}</div>
+  `;
   elements.noteInbox.prepend(item);
+
+  if (isUnread) {
+    state.unreadNotesCount++;
+    updateNoteBadge();
+  }
+}
+
+function updateNoteBadge() {
+  if (!elements.noteBadge) return;
+  if (state.unreadNotesCount > 0) {
+    elements.noteBadge.classList.remove('hidden');
+  } else {
+    elements.noteBadge.classList.add('hidden');
+  }
 }
 
 function saveToHistory(direction, name, size) {
@@ -637,6 +665,21 @@ function setupEventListeners() {
       elements.textNote.value = '';
     }
   };
+
+  const btnToggleNotes = document.getElementById('btn-toggle-notes');
+  const notesCollapsible = document.getElementById('notes-collapsible');
+  if (btnToggleNotes && notesCollapsible) {
+    btnToggleNotes.onclick = () => {
+      const isCollapsed = notesCollapsible.classList.toggle('collapsed');
+      btnToggleNotes.parentElement.classList.toggle('collapsed-container', isCollapsed);
+      
+      if (!isCollapsed) {
+        state.unreadNotesCount = 0;
+        updateNoteBadge();
+        document.querySelectorAll('.note-item.unread').forEach(el => el.classList.remove('unread'));
+      }
+    };
+  }
 
   elements.textNote.onkeydown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
