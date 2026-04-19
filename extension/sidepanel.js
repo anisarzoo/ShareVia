@@ -45,11 +45,10 @@ async function encryptPayload(data) {
       const buffer = data.chunk instanceof ArrayBuffer ? data.chunk : data.chunk.buffer;
       const bytes = new Uint8Array(buffer);
       let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
+      for (let i = 0; i < bytes.byteLength; i += 8192) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
       }
-      const base64 = btoa(binary);
-      payloadToEncrypt = { ...data, chunk: base64, _isBinary: true };
+      payloadToEncrypt = { ...data, chunk: btoa(binary), _isBinary: true };
     }
 
     const keyMaterial = await crypto.subtle.importKey(
@@ -67,10 +66,17 @@ async function encryptPayload(data) {
       encoder.encode(JSON.stringify(payloadToEncrypt))
     );
 
+    // Use Base64 for the cipher to keep the object flat and avoid PeerJS packer stack issues
+    const cipherBytes = new Uint8Array(encrypted);
+    let cipherBinary = '';
+    for (let i = 0; i < cipherBytes.byteLength; i += 8192) {
+      cipherBinary += String.fromCharCode.apply(null, cipherBytes.subarray(i, i + 8192));
+    }
+
     return {
       type: 'e2ee-wrap',
       iv: Array.from(iv),
-      cipher: Array.from(new Uint8Array(encrypted))
+      cipher: btoa(cipherBinary)
     };
   } catch (e) {
     console.warn('Encryption failed', e);
@@ -94,16 +100,23 @@ async function decryptPayload(wrapped) {
       ['decrypt']
     );
 
+    // Decode cipher from Base64
+    const cipherBinary = atob(wrapped.cipher);
+    const cipherBytes = new Uint8Array(cipherBinary.length);
+    for (let i = 0; i < cipherBinary.length; i++) {
+        cipherBytes[i] = cipherBinary.charCodeAt(i);
+    }
+
     const decrypted = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: new Uint8Array(wrapped.iv) },
       keyMaterial,
-      new Uint8Array(wrapped.cipher)
+      cipherBytes
     );
 
     const decryptedStr = new TextDecoder().decode(decrypted);
     const data = JSON.parse(decryptedStr);
 
-    // Binary safe: Restore ArrayBuffer from Base64
+    // Restore ArrayBuffer from Base64 if it was binary
     if (data._isBinary && data.chunk) {
       const binaryString = atob(data.chunk);
       const bytes = new Uint8Array(binaryString.length);
